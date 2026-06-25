@@ -1,0 +1,13 @@
+{{define "content"}}
+<div class="window" style="max-width:520px">
+  <div class="title-bar"><div class="title-bar-text">Prepare - {{.Source.Title}}</div></div>
+  <div class="window-body">
+    <p>This source has not been prepared yet. Preparing generates a summary and
+       quiz for each of its {{len .Source.Sections}} sections. This can take a
+       minute and uses your Claude subscription.</p>
+    <form method="POST" action="/study/{{.Source.ID}}/prepare" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='preparing...'">
+      <button type="submit">Prepare this source</button>
+    </form>
+  </div>
+</div>
+{{end}}

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"strconv"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/model"
@@ -44,6 +45,8 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(sub)))
 	mux.HandleFunc("GET /{$}", s.handleHome)
+	mux.HandleFunc("GET /study/{id}", s.handleStudyEntry)
+	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
 	return mux
 }
 
@@ -98,3 +101,46 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "home.html", map[string]any{"Title": "", "Sources": rows})
 }
+
+func (s *Server) handleStudyEntry(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	prepared, err := s.store.IsPrepared(ctx, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !prepared {
+		s.render(w, "prepare.html", map[string]any{"Title": src.Title, "Source": src})
+		return
+	}
+	statuses, err := s.store.GetSectionStatuses(ctx, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	idx := study.CurrentSectionIdx(study.OrderedStatuses(src, statuses))
+	http.Redirect(w, r, "/study/"+id+"/"+itoa(idx), http.StatusSeeOther)
+}
+
+func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := study.PrepareSource(ctx, s.inv, s.store, src, s.newID, nil); err != nil {
+		http.Error(w, "prepare failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/study/"+id+"/0", http.StatusSeeOther)
+}
+
+func itoa(i int) string { return strconv.Itoa(i) }
