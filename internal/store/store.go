@@ -11,7 +11,7 @@ import (
 // ErrNotFound is returned when a requested record does not exist.
 var ErrNotFound = errors.New("not found")
 
-// Store persists sources, sections, study packages, questions, and progress.
+// Store persists sources, sections, study packages, questions, progress, and builds.
 type Store interface {
 	SaveSource(ctx context.Context, s *model.Source) error
 	GetSource(ctx context.Context, id string) (*model.Source, error)
@@ -26,6 +26,10 @@ type Store interface {
 	GetSection(ctx context.Context, sectionID string) (*model.Section, error)
 	SetQuestionVerdict(ctx context.Context, questionID, verdict string) error
 	SectionSatisfied(ctx context.Context, sectionID string) (bool, error)
+	SaveBuild(ctx context.Context, b *model.Build) error
+	GetBuild(ctx context.Context, sourceID, language string) (*model.Build, error)
+	SetBuildStepStatus(ctx context.Context, stepID, status string) error
+	GetBuildStep(ctx context.Context, stepID string) (*model.BuildStep, error)
 	Close() error
 }
 
@@ -69,4 +73,22 @@ CREATE TABLE IF NOT EXISTS question_progress (
 	question_id TEXT PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE,
 	verdict     TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS builds (
+	id          TEXT PRIMARY KEY,
+	source_id   TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+	language    TEXT NOT NULL,
+	difficulty  TEXT NOT NULL,
+	workspace   TEXT NOT NULL,
+	created_at  INTEGER NOT NULL,
+	UNIQUE(source_id, language)
+);
+CREATE TABLE IF NOT EXISTS build_steps (
+	id         TEXT PRIMARY KEY,
+	build_id   TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+	idx        INTEGER NOT NULL,
+	goal       TEXT NOT NULL,
+	files_json TEXT NOT NULL,
+	status     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_build_steps_build ON build_steps(build_id, idx);
 `
