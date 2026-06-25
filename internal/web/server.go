@@ -1,7 +1,9 @@
 package web
 
 import (
+	"context"
 	"embed"
+	"encoding/json"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -48,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /study/{id}", s.handleStudyEntry)
 	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
 	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
+	mux.HandleFunc("POST /grade", s.handleGrade)
 	return mux
 }
 
@@ -145,6 +148,96 @@ func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
 }
 
 func itoa(i int) string { return strconv.Itoa(i) }
+
+type gradeRequest struct {
+	QuestionID string `json:"questionId"`
+	Choice     int    `json:"choice"`
+	Answer     string `json:"answer"`
+}
+
+type gradeResponse struct {
+	Verdict       string `json:"verdict"`
+	Feedback      string `json:"feedback"`
+	SectionPassed bool   `json:"sectionPassed"`
+}
+
+func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req gradeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	q, err := s.store.GetQuestion(ctx, req.QuestionID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	var v study.Verdict
+	if q.Kind == model.KindMCQ {
+		v = study.GradeChoice(q, req.Choice)
+	} else {
+		sec, err := s.store.GetSection(ctx, q.SectionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		v, err = study.GradeFree(ctx, s.inv, sec.Markdown, q, req.Answer)
+		if err != nil {
+			http.Error(w, "grading unavailable", http.StatusBadGateway)
+			return
+		}
+	}
+	if err := s.store.SetQuestionVerdict(ctx, q.ID, v.Verdict); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := gradeResponse{Verdict: v.Verdict, Feedback: v.Feedback}
+	if v.Verdict != "fail" {
+		satisfied, err := s.store.SectionSatisfied(ctx, q.SectionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if satisfied {
+			if err := s.passAndUnlockNext(ctx, q.SectionID); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			resp.SectionPassed = true
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// passAndUnlockNext marks the section passed and unlocks the following section
+// (by source order) if it is currently locked.
+func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error {
+	sec, err := s.store.GetSection(ctx, sectionID)
+	if err != nil {
+		return err
+	}
+	if err := s.store.SetSectionStatus(ctx, sectionID, model.StatusPassed); err != nil {
+		return err
+	}
+	src, err := s.store.GetSource(ctx, sec.SourceID)
+	if err != nil {
+		return err
+	}
+	next := sec.Idx + 1
+	if next < len(src.Sections) {
+		statuses, err := s.store.GetSectionStatuses(ctx, src.ID)
+		if err != nil {
+			return err
+		}
+		nextID := src.Sections[next].ID
+		if statuses[nextID] == model.StatusLocked {
+			return s.store.SetSectionStatus(ctx, nextID, model.StatusUnlocked)
+		}
+	}
+	return nil
+}
 
 type navItem struct {
 	Idx      int
