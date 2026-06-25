@@ -17,6 +17,8 @@ type Store interface {
 	GetSource(ctx context.Context, id string) (*model.Source, error)
 	ListSources(ctx context.Context) ([]*model.Source, error)
 	DeleteSource(ctx context.Context, id string) error
+	SaveSectionStudy(ctx context.Context, s *model.SectionStudy) error
+	GetSectionStudy(ctx context.Context, sectionID string) (*model.SectionStudy, error)
 	Close() error
 }
 
@@ -35,4 +37,25 @@ CREATE TABLE IF NOT EXISTS sections (
 	markdown  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sections_source ON sections(source_id, idx);
+CREATE TABLE IF NOT EXISTS section_study (
+	section_id   TEXT PRIMARY KEY REFERENCES sections(id) ON DELETE CASCADE,
+	summary      TEXT NOT NULL,
+	key_concepts TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS questions (
+	id            TEXT PRIMARY KEY,
+	section_id    TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+	idx           INTEGER NOT NULL,
+	kind          TEXT NOT NULL,
+	prompt        TEXT NOT NULL,
+	options       TEXT,
+	correct_index INTEGER,
+	rubric        TEXT,
+	explanation   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_questions_section ON questions(section_id, idx);
+CREATE TABLE IF NOT EXISTS section_progress (
+	section_id TEXT PRIMARY KEY REFERENCES sections(id) ON DELETE CASCADE,
+	status     TEXT NOT NULL
+);
 `
