@@ -53,3 +53,11 @@ func TestAddRequiresArg(t *testing.T) {
 		t.Fatal("expected non-zero exit when add has no argument")
 	}
 }
+
+func TestRunEmptyArgs(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{}, d, &out, &errOut); code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+}

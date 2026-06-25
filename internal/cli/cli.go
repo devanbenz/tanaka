@@ -57,6 +57,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 // run dispatches subcommands using the provided dependencies.
 func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka <command> [args]")
+		return 2
+	}
 	switch args[0] {
 	case "version":
 		fmt.Fprintf(stdout, "tanaka %s\n", version)
