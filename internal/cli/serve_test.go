@@ -18,3 +18,14 @@ func TestServeRejectsBadPort(t *testing.T) {
 		t.Fatalf("stderr = %q, want it to mention port", errOut.String())
 	}
 }
+
+func TestServeRejectsTooLargePort(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"serve", "--port", "70000"}, d, &out, &errOut); code != 2 {
+		t.Fatalf("expected exit 2 for too-large port, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "port") {
+		t.Fatalf("stderr = %q, want it to mention port", errOut.String())
+	}
+}

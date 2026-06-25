@@ -226,7 +226,10 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 	addr := fmt.Sprintf("127.0.0.1:%d", *port)
 	fmt.Fprintf(stdout, "Tanaka study UI on http://%s  (Ctrl-C to stop)\n", addr)
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
-	go func() { <-ctx.Done(); httpSrv.Close() }()
+	go func() {
+		<-ctx.Done()
+		httpSrv.Shutdown(context.Background())
+	}()
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1
