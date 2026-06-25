@@ -5,3 +5,6 @@ A local tool that turns technical content into a study-then-build learning flow.
 /.tanaka/
 tanaka
 *.db
+
+# Subagent-driven-development scratch (ledger, briefs, reports, diffs)
+.superpowers/
