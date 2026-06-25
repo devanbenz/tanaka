@@ -25,6 +25,10 @@ List what you have imported:
 
     tanaka list
 
+Show help (also shown when run with no command):
+
+    tanaka help
+
 ## How it works
 
 `tanaka add` reads the raw content and asks the `claude` CLI to clean it into

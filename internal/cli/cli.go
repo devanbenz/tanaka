@@ -16,6 +16,22 @@ import (
 
 const version = "0.0.1"
 
+const helpText = `Tanaka turns technical content into a study-then-build learning flow.
+
+Usage:
+  tanaka <command> [args]
+
+Commands:
+  add <file|url|->   Import content from a file, a URL, or stdin (-)
+  list               List imported sources
+  version            Print the version
+  help               Show this help
+
+Run with no command to show this help.
+`
+
+func printHelp(w io.Writer) { fmt.Fprint(w, helpText) }
+
 // deps carries injectable dependencies so commands are testable.
 type deps struct {
 	invoker agent.Invoker
@@ -26,12 +42,12 @@ type deps struct {
 
 // Run builds real dependencies and dispatches the command.
 func Run(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: tanaka <command> [args]")
-		return 2
-	}
-	// Short-circuit for version before opening the DB; run also handles version
+	// Handle commands that need no DB before opening one. run also handles these
 	// for direct (test) calls that bypass Run.
+	if len(args) == 0 || args[0] == "help" {
+		printHelp(stdout)
+		return 0
+	}
 	if args[0] == "version" {
 		fmt.Fprintf(stdout, "tanaka %s\n", version)
 		return 0
@@ -64,10 +80,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 // run dispatches subcommands using the provided dependencies.
 func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: tanaka <command> [args]")
-		return 2
+		printHelp(stdout)
+		return 0
 	}
 	switch args[0] {
+	case "help":
+		printHelp(stdout)
+		return 0
 	case "version":
 		fmt.Fprintf(stdout, "tanaka %s\n", version)
 		return 0
@@ -76,7 +95,7 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 	case "list":
 		return cmdList(ctx, d, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
+		fmt.Fprintf(stderr, "unknown command: %s\nrun 'tanaka help' for usage\n", args[0])
 		return 2
 	}
 }

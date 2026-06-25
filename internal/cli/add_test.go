@@ -55,11 +55,41 @@ func TestAddRequiresArg(t *testing.T) {
 	}
 }
 
-func TestRunEmptyArgs(t *testing.T) {
+func TestRunEmptyArgsShowsHelp(t *testing.T) {
 	d := testDeps(t)
 	var out, errOut bytes.Buffer
-	if code := run(context.Background(), []string{}, d, &out, &errOut); code != 2 {
-		t.Fatalf("exit = %d, want 2", code)
+	code := run(context.Background(), []string{}, d, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0", code)
+	}
+	if !strings.Contains(out.String(), "Usage:") || !strings.Contains(out.String(), "add") {
+		t.Fatalf("no-args output %q does not look like help", out.String())
+	}
+}
+
+func TestRunHelpCommand(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	code := run(context.Background(), []string{"help"}, d, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("help exit = %d, want 0", code)
+	}
+	got := out.String()
+	for _, want := range []string{"Usage:", "add", "list", "version", "help"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("help output %q missing %q", got, want)
+		}
+	}
+}
+
+func TestRunNoArgsTopLevelShowsHelp(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := Run([]string{}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("Run([]) exit = %d, want 0; stderr=%q", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "Usage:") {
+		t.Fatalf("Run([]) output %q does not look like help", out.String())
 	}
 }
 
