@@ -109,14 +109,9 @@ func cmdAdd(ctx context.Context, args []string, d deps, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "claude CLI unavailable: %v\nis it installed and logged in? try: claude login\n", err)
 		return 1
 	}
-	raw, err := ingest.Read(ctx, args[0], d.stdin)
+	src, err := ingest.Ingest(ctx, d.invoker, args[0], d.stdin, d.newID)
 	if err != nil {
-		fmt.Fprintf(stderr, "read: %v\n", err)
-		return 1
-	}
-	src, err := ingest.Structure(ctx, d.invoker, raw, d.newID)
-	if err != nil {
-		fmt.Fprintf(stderr, "structure: %v\n", err)
+		fmt.Fprintf(stderr, "ingest: %v\n", err)
 		return 1
 	}
 	if err := d.store.SaveSource(ctx, src); err != nil {

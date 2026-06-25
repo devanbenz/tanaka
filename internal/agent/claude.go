@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // Claude invokes the `claude` CLI in headless print mode.
@@ -44,10 +45,16 @@ func (c *Claude) Invoke(ctx context.Context, job Job) (json.RawMessage, error) {
 	if job.Schema != "" {
 		args = append(args, "--json-schema", job.Schema)
 	}
+	if len(job.AllowedTools) > 0 {
+		args = append(args, "--allowedTools", strings.Join(job.AllowedTools, ","))
+	}
 	cmd := exec.CommandContext(ctx, c.binary, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if len(job.Stdin) > 0 {
+		cmd.Stdin = bytes.NewReader(job.Stdin)
+	}
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("claude invoke: %w; stderr: %s", err, stderr.String())
 	}

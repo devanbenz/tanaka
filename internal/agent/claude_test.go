@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -52,6 +53,62 @@ func TestClaudeInvokeRejectsNullStructuredOutput(t *testing.T) {
 	_, err := c.Invoke(context.Background(), Job{Prompt: "hi", Schema: ""})
 	if err == nil {
 		t.Fatal("expected error when structured_output is null")
+	}
+}
+
+// writeEchoStub writes a fake `claude` that echoes the args it received and the
+// content piped to its stdin, so tests can assert how Invoke called it.
+func writeEchoStub(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("stub uses a POSIX shell script")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "claude")
+	script := "#!/bin/sh\n" +
+		`ARGS="$*"` + "\n" +
+		`IN="$(cat)"` + "\n" +
+		`printf '{"result":"ok","structured_output":{"args":"%s","stdin":"%s"}}\n' "$ARGS" "$IN"` + "\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	return path
+}
+
+func TestClaudeInvokePipesStdin(t *testing.T) {
+	stub := writeEchoStub(t)
+	c := NewClaude(stub)
+	raw, err := c.Invoke(context.Background(), Job{Prompt: "p", Stdin: []byte("hello-stdin")})
+	if err != nil {
+		t.Fatalf("Invoke: %v", err)
+	}
+	var got struct {
+		Args  string `json:"args"`
+		Stdin string `json:"stdin"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Stdin != "hello-stdin" {
+		t.Fatalf("stdin = %q, want hello-stdin", got.Stdin)
+	}
+}
+
+func TestClaudeInvokePassesAllowedTools(t *testing.T) {
+	stub := writeEchoStub(t)
+	c := NewClaude(stub)
+	raw, err := c.Invoke(context.Background(), Job{Prompt: "p", AllowedTools: []string{"Read", "WebFetch"}})
+	if err != nil {
+		t.Fatalf("Invoke: %v", err)
+	}
+	var got struct {
+		Args string `json:"args"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !strings.Contains(got.Args, "--allowedTools Read,WebFetch") {
+		t.Fatalf("args = %q, want --allowedTools Read,WebFetch", got.Args)
 	}
 }
 

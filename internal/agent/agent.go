@@ -9,10 +9,14 @@ import (
 	"strings"
 )
 
-// Job is one agent request: a prompt and the JSON schema its answer must satisfy.
+// Job is one agent request. Large or binary content must travel via Stdin (or be
+// read by the agent itself via a tool) — never embedded in Prompt, because Prompt
+// becomes a command-line argument and argv cannot contain NUL bytes or huge data.
 type Job struct {
-	Prompt string
-	Schema string
+	Prompt       string
+	Schema       string
+	Stdin        []byte   // optional: piped to the agent's stdin
+	AllowedTools []string // optional: tools the agent may use (e.g. Read, WebFetch)
 }
 
 // Invoker runs a Job and returns the structured-output object as raw JSON.
