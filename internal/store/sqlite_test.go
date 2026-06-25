@@ -63,10 +63,12 @@ func TestGetSourceNotFound(t *testing.T) {
 func TestListSources(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
-	for _, id := range []string{"a", "b"} {
-		if err := s.SaveSource(ctx, &model.Source{ID: id, Title: id, Origin: "x", CreatedAt: time.Unix(1, 0)}); err != nil {
-			t.Fatalf("SaveSource %s: %v", id, err)
-		}
+	// Insert newer first to prove ordering is by created_at, not insertion order.
+	if err := s.SaveSource(ctx, &model.Source{ID: "b", Title: "b", Origin: "x", CreatedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveSource b: %v", err)
+	}
+	if err := s.SaveSource(ctx, &model.Source{ID: "a", Title: "a", Origin: "x", CreatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveSource a: %v", err)
 	}
 	list, err := s.ListSources(ctx)
 	if err != nil {
@@ -74,5 +76,9 @@ func TestListSources(t *testing.T) {
 	}
 	if len(list) != 2 {
 		t.Fatalf("got %d sources, want 2", len(list))
+	}
+	// Oldest (a, Unix(1)) must come first.
+	if list[0].ID != "a" || list[1].ID != "b" {
+		t.Fatalf("wrong order: got [%s, %s], want [a, b]", list[0].ID, list[1].ID)
 	}
 }

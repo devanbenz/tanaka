@@ -43,6 +43,9 @@ func TestStructureBuildsSource(t *testing.T) {
 	if src.Sections[0].SourceID != src.ID {
 		t.Fatalf("section SourceID %q != source ID %q", src.Sections[0].SourceID, src.ID)
 	}
+	if src.CreatedAt.IsZero() {
+		t.Fatal("CreatedAt not set")
+	}
 	// The raw content must reach the agent.
 	if !strings.Contains(fake.Calls[0].Prompt, "raw bytes") {
 		t.Fatalf("prompt did not include raw content: %q", fake.Calls[0].Prompt)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/app"
@@ -29,6 +30,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: tanaka <command> [args]")
 		return 2
 	}
+	// Short-circuit for version before opening the DB; run also handles version
+	// for direct (test) calls that bypass Run.
 	if args[0] == "version" {
 		fmt.Fprintf(stdout, "tanaka %s\n", version)
 		return 0
@@ -46,13 +49,16 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer st.Close()
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	d := deps{
 		invoker: agent.NewClaude(""),
 		store:   st,
 		newID:   app.NewID,
 		stdin:   os.Stdin,
 	}
-	return run(context.Background(), args, d, stdout, stderr)
+	return run(ctx, args, d, stdout, stderr)
 }
 
 // run dispatches subcommands using the provided dependencies.
@@ -79,6 +85,10 @@ func cmdAdd(ctx context.Context, args []string, d deps, stdout, stderr io.Writer
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: tanaka add <file|url|->")
 		return 2
+	}
+	if err := d.invoker.Check(ctx); err != nil {
+		fmt.Fprintf(stderr, "claude CLI unavailable: %v\nis it installed and logged in? try: claude login\n", err)
+		return 1
 	}
 	raw, err := ingest.Read(ctx, args[0], d.stdin)
 	if err != nil {

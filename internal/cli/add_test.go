@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -59,5 +60,19 @@ func TestRunEmptyArgs(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := run(context.Background(), []string{}, d, &out, &errOut); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
+func TestAddCheckFailure(t *testing.T) {
+	d := testDeps(t)
+	d.invoker = &agent.Fake{CheckErr: errors.New("not found")}
+	d.stdin = strings.NewReader("some content")
+	var out, errOut bytes.Buffer
+	code := run(context.Background(), []string{"add", "-"}, d, &out, &errOut)
+	if code == 0 {
+		t.Fatal("expected non-zero exit when Check fails")
+	}
+	if !strings.Contains(errOut.String(), "claude CLI unavailable") {
+		t.Fatalf("stderr %q does not mention 'claude CLI unavailable'", errOut.String())
 	}
 }

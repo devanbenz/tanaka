@@ -8,7 +8,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
+
+// httpClient is a package-level client with a 30-second timeout.
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // RawSource is unstructured ingested content plus its origin.
 type RawSource struct {
@@ -30,7 +34,7 @@ func Read(ctx context.Context, arg string, stdin io.Reader) (*RawSource, error) 
 		if err != nil {
 			return nil, err
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("fetch %s: %w", arg, err)
 		}

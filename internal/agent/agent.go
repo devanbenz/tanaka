@@ -17,6 +17,7 @@ type Job struct {
 
 // Invoker runs a Job and returns the structured-output object as raw JSON.
 type Invoker interface {
+	Check(ctx context.Context) error
 	Invoke(ctx context.Context, job Job) (json.RawMessage, error)
 }
 
@@ -25,8 +26,12 @@ type Invoker interface {
 type Fake struct {
 	Responses map[string]json.RawMessage
 	Err       error
+	CheckErr  error
 	Calls     []Job
 }
+
+// Check returns CheckErr (nil by default, simulating a healthy CLI).
+func (f *Fake) Check(_ context.Context) error { return f.CheckErr }
 
 // Invoke records the call and returns the matching canned response.
 func (f *Fake) Invoke(_ context.Context, job Job) (json.RawMessage, error) {

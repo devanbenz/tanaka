@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -61,23 +62,23 @@ func (s *sqliteStore) GetSource(ctx context.Context, id string) (*model.Source, 
 	var src model.Source
 	var created int64
 	if err := row.Scan(&src.ID, &src.Title, &src.Origin, &created); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("scan source %s: %w", id, err)
 	}
 	src.CreatedAt = time.Unix(created, 0).UTC()
 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, source_id, idx, title, markdown FROM sections WHERE source_id = ? ORDER BY idx`, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query sections for %s: %w", id, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var sec model.Section
 		if err := rows.Scan(&sec.ID, &sec.SourceID, &sec.Idx, &sec.Title, &sec.Markdown); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan section for %s: %w", id, err)
 		}
 		src.Sections = append(src.Sections, sec)
 	}
@@ -88,7 +89,7 @@ func (s *sqliteStore) ListSources(ctx context.Context) ([]*model.Source, error) 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, origin, created_at FROM sources ORDER BY created_at`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query sources: %w", err)
 	}
 	defer rows.Close()
 	var out []*model.Source
@@ -96,7 +97,7 @@ func (s *sqliteStore) ListSources(ctx context.Context) ([]*model.Source, error) 
 		var src model.Source
 		var created int64
 		if err := rows.Scan(&src.ID, &src.Title, &src.Origin, &created); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan source row: %w", err)
 		}
 		src.CreatedAt = time.Unix(created, 0).UTC()
 		out = append(out, &src)

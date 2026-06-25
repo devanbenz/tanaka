@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/model"
@@ -58,9 +59,10 @@ func Structure(ctx context.Context, inv agent.Invoker, raw *RawSource, newID fun
 		return nil, fmt.Errorf("agent returned no sections for %s", raw.Origin)
 	}
 	src := &model.Source{
-		ID:     newID(),
-		Title:  res.Title,
-		Origin: raw.Origin,
+		ID:        newID(),
+		Title:     res.Title,
+		Origin:    raw.Origin,
+		CreatedAt: time.Now().UTC(),
 	}
 	for i, s := range res.Sections {
 		src.Sections = append(src.Sections, model.Section{
