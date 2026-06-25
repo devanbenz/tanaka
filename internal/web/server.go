@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -170,7 +171,11 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	}
 	q, err := s.store.GetQuestion(ctx, req.QuestionID)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	var v study.Verdict
@@ -208,7 +213,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // passAndUnlockNext marks the section passed and unlocks the following section

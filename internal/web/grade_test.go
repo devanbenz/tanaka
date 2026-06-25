@@ -53,7 +53,6 @@ func (f *fakeGrader) Invoke(ctx context.Context, job agent.Job) (json.RawMessage
 
 func TestGradeFreePassUnlocksNext(t *testing.T) {
 	srv, st := testServer(t)
-	srv.inv = studyFake() // its grade-answer fake below
 	srv.inv = &fakeGrader{verdict: "pass", feedback: "good"}
 	preppedWithFreeQ(t, srv)
 	rec := gradeReq(t, srv, `{"questionId":"q1","answer":"because"}`)
