@@ -29,8 +29,9 @@
           <form class="quiz-form" data-qid="{{.ID}}">
             <p>{{.Prompt}}</p>
             {{if eq .Kind "mcq"}}
+              {{$qid := .ID}}
               {{range $i, $opt := .Options}}
-                <div class="field-row"><input type="radio" id="{{$.Section.ID}}-{{$.Section.Idx}}-{{$opt}}" name="opt-{{.}}" value="{{$i}}"><label>{{$opt}}</label></div>
+                <div class="field-row"><input type="radio" id="q-{{$qid}}-{{$i}}" name="q-{{$qid}}" value="{{$i}}"><label for="q-{{$qid}}-{{$i}}">{{$opt}}</label></div>
               {{end}}
             {{else}}
               <textarea rows="4" cols="50"></textarea>
@@ -43,7 +44,13 @@
       </div>
       <div class="field-row" style="justify-content:space-between">
         <form method="POST" action="/study/{{.Source.ID}}/{{.Section.Idx}}/skip"><button type="submit">Skip section</button></form>
-        {{if .HasNext}}<a href="/study/{{.Source.ID}}/{{.NextIdx}}"><button id="next-btn" {{if not .NextUnlocked}}disabled{{end}}>Next</button></a>{{end}}
+        {{if .HasNext}}
+          {{if .NextUnlocked}}
+            <a href="/study/{{.Source.ID}}/{{.NextIdx}}"><button id="next-btn">Next</button></a>
+          {{else}}
+            <button id="next-btn" disabled>Next</button>
+          {{end}}
+        {{end}}
       </div>
     </div>
   </div>

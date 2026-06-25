@@ -60,3 +60,41 @@ func TestSectionOutOfRangeIs404(t *testing.T) {
 	_ = context.Background
 	_ = model.StatusLocked
 }
+
+func TestSectionMCQRadiosShareOneName(t *testing.T) {
+	srv, st := testServer(t)
+	ctx := context.Background()
+	addSource(t, st, "src1", 1)
+	if err := st.SaveSectionStudy(ctx, &model.SectionStudy{
+		SectionID: "src1-s0", Summary: "s", KeyConcepts: []string{"k"},
+		Questions: []model.Question{{ID: "qm", SectionID: "src1-s0", Idx: 0, Kind: model.KindMCQ, Prompt: "pick", Options: []string{"Paris", "Rome", "Berlin"}, CorrectIndex: 0}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	st.SetSectionStatus(ctx, "src1-s0", model.StatusUnlocked)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/study/src1/0", nil))
+	body := rec.Body.String()
+	if c := strings.Count(body, `name="q-qm"`); c != 3 {
+		t.Fatalf("expected 3 radios sharing name q-qm, got %d; body=%s", c, body)
+	}
+	if strings.Contains(body, `name="opt-`) {
+		t.Fatalf("old per-option name still present")
+	}
+	// correct answer must not leak into the page
+	if strings.Contains(body, "CorrectIndex") {
+		t.Fatalf("correct answer leaked")
+	}
+}
+
+func TestNextNotNavigableUntilSectionDone(t *testing.T) {
+	srv, _ := testServer(t)
+	prep(t, srv) // src1, 2 sections, section 0 unlocked, not yet passed
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/study/src1/0", nil))
+	body := rec.Body.String()
+	// Section 0 is not passed/skipped, so there must be no navigable link to section 1.
+	if strings.Contains(body, `href="/study/src1/1"`) {
+		t.Fatalf("Next should not be a followable link before the section is done; body=%s", body)
+	}
+}
