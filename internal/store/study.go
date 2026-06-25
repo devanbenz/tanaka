@@ -91,3 +91,74 @@ func (s *sqliteStore) GetSectionStudy(ctx context.Context, sectionID string) (*m
 	}
 	return study, rows.Err()
 }
+
+func (s *sqliteStore) IsPrepared(ctx context.Context, sourceID string) (bool, error) {
+	var total, studied int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sections WHERE source_id = ?`, sourceID).Scan(&total); err != nil {
+		return false, fmt.Errorf("count sections: %w", err)
+	}
+	if total == 0 {
+		return false, nil
+	}
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM section_study st
+		 JOIN sections se ON se.id = st.section_id WHERE se.source_id = ?`, sourceID).Scan(&studied); err != nil {
+		return false, fmt.Errorf("count studied: %w", err)
+	}
+	return studied == total, nil
+}
+
+func (s *sqliteStore) GetSectionStatuses(ctx context.Context, sourceID string) (map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT se.id, COALESCE(sp.status, ?) FROM sections se
+		 LEFT JOIN section_progress sp ON sp.section_id = se.id
+		 WHERE se.source_id = ?`, model.StatusLocked, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("query statuses: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, status string
+		if err := rows.Scan(&id, &status); err != nil {
+			return nil, fmt.Errorf("scan status: %w", err)
+		}
+		out[id] = status
+	}
+	return out, rows.Err()
+}
+
+func (s *sqliteStore) SetSectionStatus(ctx context.Context, sectionID, status string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO section_progress (section_id, status) VALUES (?, ?)
+		 ON CONFLICT(section_id) DO UPDATE SET status=excluded.status`, sectionID, status)
+	if err != nil {
+		return fmt.Errorf("set status %s: %w", sectionID, err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) GetQuestion(ctx context.Context, questionID string) (*model.Question, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, section_id, idx, kind, prompt, options, correct_index, rubric, explanation
+		 FROM questions WHERE id = ?`, questionID)
+	var q model.Question
+	var opts, rubric, expl sql.NullString
+	var correct sql.NullInt64
+	if err := row.Scan(&q.ID, &q.SectionID, &q.Idx, &q.Kind, &q.Prompt, &opts, &correct, &rubric, &expl); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get question %s: %w", questionID, err)
+	}
+	if opts.Valid && opts.String != "" {
+		if err := json.Unmarshal([]byte(opts.String), &q.Options); err != nil {
+			return nil, fmt.Errorf("unmarshal options: %w", err)
+		}
+	}
+	q.CorrectIndex = int(correct.Int64)
+	q.Rubric = rubric.String
+	q.Explanation = expl.String
+	return &q, nil
+}

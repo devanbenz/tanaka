@@ -19,6 +19,10 @@ type Store interface {
 	DeleteSource(ctx context.Context, id string) error
 	SaveSectionStudy(ctx context.Context, s *model.SectionStudy) error
 	GetSectionStudy(ctx context.Context, sectionID string) (*model.SectionStudy, error)
+	IsPrepared(ctx context.Context, sourceID string) (bool, error)
+	GetSectionStatuses(ctx context.Context, sourceID string) (map[string]string, error)
+	SetSectionStatus(ctx context.Context, sectionID, status string) error
+	GetQuestion(ctx context.Context, questionID string) (*model.Question, error)
 	Close() error
 }
 
