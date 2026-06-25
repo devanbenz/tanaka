@@ -78,3 +78,34 @@ func TestGetSectionStudyNotFound(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestDeleteSourceCascadesStudyTables(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	sourceWithSection(t, s, "src1", "sec1")
+	if err := s.SaveSectionStudy(ctx, &model.SectionStudy{
+		SectionID: "sec1", Summary: "x", KeyConcepts: []string{"k"},
+		Questions: []model.Question{{ID: "q1", SectionID: "sec1", Idx: 0, Kind: model.KindFree, Prompt: "p", Rubric: "r"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSectionStatus(ctx, "sec1", model.StatusPassed); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteSource(ctx, "src1"); err != nil {
+		t.Fatalf("DeleteSource: %v", err)
+	}
+	if _, err := s.GetSectionStudy(ctx, "sec1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("section_study should be gone, err = %v", err)
+	}
+	if _, err := s.GetQuestion(ctx, "q1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("question should be gone, err = %v", err)
+	}
+	statuses, err := s.GetSectionStatuses(ctx, "src1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 0 {
+		t.Fatalf("section_progress should be gone, got %d rows", len(statuses))
+	}
+}

@@ -3,6 +3,7 @@ package study
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/devandbenz/tanaka/internal/agent"
@@ -84,6 +85,8 @@ func PrepareSource(ctx context.Context, inv agent.Invoker, st store.Store, src *
 	for i, sec := range src.Sections {
 		if _, err := st.GetSectionStudy(ctx, sec.ID); err == nil {
 			continue // already prepared
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("check section %s: %w", sec.ID, err)
 		}
 		if onSection != nil {
 			onSection(i, total, sec.Title)

@@ -11,7 +11,7 @@ import (
 // ErrNotFound is returned when a requested record does not exist.
 var ErrNotFound = errors.New("not found")
 
-// Store persists sources and their sections.
+// Store persists sources, sections, study packages, questions, and progress.
 type Store interface {
 	SaveSource(ctx context.Context, s *model.Source) error
 	GetSource(ctx context.Context, id string) (*model.Source, error)

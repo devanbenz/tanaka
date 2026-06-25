@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/devandbenz/tanaka/internal/model"
@@ -54,7 +55,7 @@ func (s *sqliteStore) GetSectionStudy(ctx context.Context, sectionID string) (*m
 		`SELECT summary, key_concepts FROM section_study WHERE section_id = ?`, sectionID)
 	var summary, concepts string
 	if err := row.Scan(&summary, &concepts); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get section_study %s: %w", sectionID, err)
@@ -147,7 +148,7 @@ func (s *sqliteStore) GetQuestion(ctx context.Context, questionID string) (*mode
 	var opts, rubric, expl sql.NullString
 	var correct sql.NullInt64
 	if err := row.Scan(&q.ID, &q.SectionID, &q.Idx, &q.Kind, &q.Prompt, &opts, &correct, &rubric, &expl); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get question %s: %w", questionID, err)
