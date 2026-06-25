@@ -12,6 +12,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/app"
 	"github.com/devandbenz/tanaka/internal/ingest"
 	"github.com/devandbenz/tanaka/internal/store"
+	"github.com/devandbenz/tanaka/internal/ui"
 )
 
 const version = "0.0.1"
@@ -109,11 +110,19 @@ func cmdAdd(ctx context.Context, args []string, d deps, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "claude CLI unavailable: %v\nis it installed and logged in? try: claude login\n", err)
 		return 1
 	}
+	label := args[0]
+	if label == "-" {
+		label = "stdin"
+	}
+	sp := ui.NewSpinner(stderr, fmt.Sprintf("reading & structuring %s", label))
+	sp.Start()
 	src, err := ingest.Ingest(ctx, d.invoker, args[0], d.stdin, d.newID)
 	if err != nil {
+		sp.Fail("could not structure the source")
 		fmt.Fprintf(stderr, "ingest: %v\n", err)
 		return 1
 	}
+	sp.Stop(fmt.Sprintf("structured %q into %d sections", src.Title, len(src.Sections)))
 	if err := d.store.SaveSource(ctx, src); err != nil {
 		fmt.Fprintf(stderr, "save: %v\n", err)
 		return 1
