@@ -1,0 +1,51 @@
+{{define "content"}}
+<div class="layout">
+  <div class="sidebar window">
+    <div class="title-bar"><div class="title-bar-text">{{.Source.Title}}</div></div>
+    <div class="window-body">
+      <ul class="section-list">
+        {{range .Nav}}
+        <li class="{{if .Current}}current{{end}} {{if not .Unlocked}}locked{{end}}">
+          {{if .Unlocked}}<a href="/study/{{$.Source.ID}}/{{.Idx}}">{{.Mark}} {{.Title}}</a>
+          {{else}}{{.Mark}} {{.Title}}{{end}}
+        </li>
+        {{end}}
+      </ul>
+      <p class="status-bar"><span class="status-bar-field">progress {{.Done}}/{{.Total}}</span></p>
+    </div>
+  </div>
+  <div class="content window">
+    <div class="title-bar"><div class="title-bar-text">{{.Section.Title}}</div></div>
+    <div class="window-body">
+      <div class="markdown">{{.Body}}</div>
+      {{if .Concepts}}
+      <fieldset><legend>Key concepts</legend>
+        <ul>{{range .Concepts}}<li>{{.}}</li>{{end}}</ul>
+      </fieldset>
+      {{end}}
+      <div class="quiz">
+        <fieldset><legend>Quiz</legend>
+        {{range .Questions}}
+          <form class="quiz-form" data-qid="{{.ID}}">
+            <p>{{.Prompt}}</p>
+            {{if eq .Kind "mcq"}}
+              {{range $i, $opt := .Options}}
+                <div class="field-row"><input type="radio" id="{{$.Section.ID}}-{{$.Section.Idx}}-{{$opt}}" name="opt-{{.}}" value="{{$i}}"><label>{{$opt}}</label></div>
+              {{end}}
+            {{else}}
+              <textarea rows="4" cols="50"></textarea>
+            {{end}}
+            <div class="field-row"><button type="submit">Check</button></div>
+            <div class="verdict"></div>
+          </form>
+        {{end}}
+        </fieldset>
+      </div>
+      <div class="field-row" style="justify-content:space-between">
+        <form method="POST" action="/study/{{.Source.ID}}/{{.Section.Idx}}/skip"><button type="submit">Skip section</button></form>
+        {{if .HasNext}}<a href="/study/{{.Source.ID}}/{{.NextIdx}}"><button id="next-btn" {{if not .NextUnlocked}}disabled{{end}}>Next</button></a>{{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -47,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleHome)
 	mux.HandleFunc("GET /study/{id}", s.handleStudyEntry)
 	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
+	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
 	return mux
 }
 
@@ -144,3 +145,80 @@ func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
 }
 
 func itoa(i int) string { return strconv.Itoa(i) }
+
+type navItem struct {
+	Idx      int
+	Title    string
+	Mark     string
+	Current  bool
+	Unlocked bool
+}
+
+func mark(status string) string {
+	switch status {
+	case model.StatusPassed:
+		return "[x]"
+	case model.StatusSkipped:
+		return "[-]"
+	default:
+		return "[ ]"
+	}
+}
+
+func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	idx, err := strconv.Atoi(r.PathValue("idx"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if idx < 0 || idx >= len(src.Sections) {
+		http.NotFound(w, r)
+		return
+	}
+	statuses, err := s.store.GetSectionStatuses(ctx, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ordered := study.OrderedStatuses(src, statuses)
+	unlocked := study.ComputeUnlocked(ordered)
+	if !unlocked[idx] {
+		s.render(w, "locked.html", map[string]any{"Title": "Locked", "SourceID": id, "PrevIdx": idx - 1})
+		return
+	}
+	sec := src.Sections[idx]
+	stud, err := s.store.GetSectionStudy(ctx, sec.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	body, err := renderMarkdown(sec.Markdown)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var nav []navItem
+	done := 0
+	for i, seci := range src.Sections {
+		nav = append(nav, navItem{Idx: i, Title: seci.Title, Mark: mark(ordered[i]), Current: i == idx, Unlocked: unlocked[i]})
+		if ordered[i] == model.StatusPassed || ordered[i] == model.StatusSkipped {
+			done++
+		}
+	}
+	hasNext := idx+1 < len(src.Sections)
+	data := map[string]any{
+		"Title": src.Title, "Source": src, "Section": sec, "Body": body,
+		"Concepts": stud.KeyConcepts, "Questions": stud.Questions, "Nav": nav,
+		"Done": done, "Total": len(src.Sections),
+		"HasNext": hasNext, "NextIdx": idx + 1,
+		"NextUnlocked": ordered[idx] == model.StatusPassed || ordered[idx] == model.StatusSkipped,
+	}
+	s.render(w, "section.html", data)
+}
