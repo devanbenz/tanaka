@@ -20,6 +20,7 @@ func NewSQLite(path string) (Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	db.SetMaxOpenConns(1)
 	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
