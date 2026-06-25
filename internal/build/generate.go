@@ -11,7 +11,7 @@ import (
 
 const fileSchema = `{"type":"object","required":["path","content"],"properties":{"path":{"type":"string"},"content":{"type":"string"}}}`
 
-var buildSchema = `{
+const buildSchema = `{
   "type": "object",
   "required": ["skeleton_files", "steps"],
   "properties": {

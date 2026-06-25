@@ -51,7 +51,7 @@ func TestGenerateBuild(t *testing.T) {
 	if !strings.Contains(string(call.Stdin), "the paper sections") {
 		t.Fatalf("section text must go via stdin: %q", call.Stdin)
 	}
-	if !strings.Contains(call.Prompt, "go") || !strings.Contains(call.Prompt, "spec+tests") {
+	if !strings.Contains(call.Prompt, "in go") || !strings.Contains(call.Prompt, "spec+tests") {
 		t.Fatalf("prompt missing language/difficulty: %q", call.Prompt)
 	}
 }
