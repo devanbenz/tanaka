@@ -93,6 +93,45 @@ func TestRunNoArgsTopLevelShowsHelp(t *testing.T) {
 	}
 }
 
+func TestRemoveDeletesSource(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	// testDeps' newID yields id1 (source), id2 (section); source id is "id1".
+	if code := run(context.Background(), []string{"add", "-"}, d, &out, &errOut); code != 0 {
+		t.Fatalf("add exit = %d; stderr=%s", code, errOut.String())
+	}
+	if code := run(context.Background(), []string{"remove", "id1"}, d, &out, &errOut); code != 0 {
+		t.Fatalf("remove exit = %d; stderr=%s", code, errOut.String())
+	}
+	out.Reset()
+	if code := run(context.Background(), []string{"list"}, d, &out, &errOut); code != 0 {
+		t.Fatalf("list exit = %d", code)
+	}
+	if !strings.Contains(out.String(), "no sources yet") {
+		t.Fatalf("after remove, list = %q, want it empty", out.String())
+	}
+}
+
+func TestRemoveRequiresArg(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"remove"}, d, &out, &errOut); code == 0 {
+		t.Fatal("expected non-zero exit when remove has no id")
+	}
+}
+
+func TestRemoveUnknownID(t *testing.T) {
+	d := testDeps(t)
+	var out, errOut bytes.Buffer
+	code := run(context.Background(), []string{"remove", "nope"}, d, &out, &errOut)
+	if code == 0 {
+		t.Fatal("expected non-zero exit for unknown id")
+	}
+	if !strings.Contains(errOut.String(), "no source with id") {
+		t.Fatalf("stderr = %q, want 'no source with id'", errOut.String())
+	}
+}
+
 func TestAddCheckFailure(t *testing.T) {
 	d := testDeps(t)
 	d.invoker = &agent.Fake{CheckErr: errors.New("not found")}

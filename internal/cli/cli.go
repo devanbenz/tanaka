@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,6 +26,7 @@ Usage:
 Commands:
   add <file|url|->   Import content from a file, a URL, or stdin (-)
   list               List imported sources
+  remove <id>        Remove an imported source (and its sections)
   version            Print the version
   help               Show this help
 
@@ -95,6 +97,8 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdAdd(ctx, args[1:], d, stdout, stderr)
 	case "list":
 		return cmdList(ctx, d, stdout, stderr)
+	case "remove":
+		return cmdRemove(ctx, args[1:], d, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\nrun 'tanaka help' for usage\n", args[0])
 		return 2
@@ -128,6 +132,23 @@ func cmdAdd(ctx context.Context, args []string, d deps, stdout, stderr io.Writer
 		return 1
 	}
 	fmt.Fprintf(stdout, "added %q (%d sections) as %s\n", src.Title, len(src.Sections), src.ID)
+	return 0
+}
+
+func cmdRemove(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka remove <id>")
+		return 2
+	}
+	if err := d.store.DeleteSource(ctx, args[0]); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", args[0])
+			return 1
+		}
+		fmt.Fprintf(stderr, "remove: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "removed %s\n", args[0])
 	return 0
 }
 

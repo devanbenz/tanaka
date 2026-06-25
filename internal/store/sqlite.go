@@ -105,4 +105,19 @@ func (s *sqliteStore) ListSources(ctx context.Context) ([]*model.Source, error) 
 	return out, rows.Err()
 }
 
+func (s *sqliteStore) DeleteSource(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sources WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete source %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete source %s: %w", id, err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *sqliteStore) Close() error { return s.db.Close() }

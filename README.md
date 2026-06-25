@@ -25,6 +25,10 @@ List what you have imported:
 
     tanaka list
 
+Remove a source by id (ids come from `tanaka list`):
+
+    tanaka remove <id>
+
 Show help (also shown when run with no command):
 
     tanaka help

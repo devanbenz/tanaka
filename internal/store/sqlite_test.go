@@ -82,3 +82,36 @@ func TestListSources(t *testing.T) {
 		t.Fatalf("wrong order: got [%s, %s], want [a, b]", list[0].ID, list[1].ID)
 	}
 }
+
+func TestDeleteSourceRemovesSourceAndSections(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	src := &model.Source{
+		ID: "d1", Title: "Doomed", Origin: "x", CreatedAt: time.Unix(1, 0),
+		Sections: []model.Section{
+			{ID: "ds1", SourceID: "d1", Idx: 0, Title: "S1", Markdown: "a"},
+			{ID: "ds2", SourceID: "d1", Idx: 1, Title: "S2", Markdown: "b"},
+		},
+	}
+	if err := s.SaveSource(ctx, src); err != nil {
+		t.Fatalf("SaveSource: %v", err)
+	}
+	if err := s.DeleteSource(ctx, "d1"); err != nil {
+		t.Fatalf("DeleteSource: %v", err)
+	}
+	if _, err := s.GetSource(ctx, "d1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("after delete GetSource err = %v, want ErrNotFound", err)
+	}
+	// Re-saving with the same section IDs must succeed, proving the old sections
+	// were cascade-deleted (otherwise the section PK insert would conflict).
+	if err := s.SaveSource(ctx, src); err != nil {
+		t.Fatalf("re-SaveSource after delete (sections not cascaded?): %v", err)
+	}
+}
+
+func TestDeleteSourceNotFound(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.DeleteSource(context.Background(), "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("DeleteSource(missing) = %v, want ErrNotFound", err)
+	}
+}

@@ -16,6 +16,7 @@ type Store interface {
 	SaveSource(ctx context.Context, s *model.Source) error
 	GetSource(ctx context.Context, id string) (*model.Source, error)
 	ListSources(ctx context.Context) ([]*model.Source, error)
+	DeleteSource(ctx context.Context, id string) error
 	Close() error
 }
 
