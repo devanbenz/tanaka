@@ -56,7 +56,7 @@ The pedagogy borrows from active-recall / productive-struggle approaches (predic
             │   • Agent Invoker ──── shells out ───┐         │
             └──────────────────────────────────────┼─────────┘
                                                     ▼
-                                       `claude --bare -p ...`
+                                       `claude -p ...`
                                   --output-format json --json-schema
                                   (structure, gen-study, grade-answer,
                                    gen-build, run-tests)
@@ -74,7 +74,8 @@ Each component has one clear purpose and is independently testable.
    - **Aesthetic (hard requirement):** retro desktop-GUI look in the spirit of Windows 95 — beveled/3D widgets, title bars, system/pixel fonts, solid colors, chunky tactile buttons. Explicitly **not** the default "LLM UI" style (gradient heroes, rounded cards, heavy whitespace, Inter/SaaS look). A library like 98.css/7.css or hand-rolled CSS is acceptable; keep it simple and pleasing.
 4. **Live grading** — On answer submit: `POST /grade` → `grade-answer` call → `{verdict: pass|partial|fail, feedback, followup?}`. On pass, unlock next section and persist progress.
 5. **Build engine** — On build start: `gen-build` call → `BuildPlan{steps[]: {goal, scaffold, acceptance_tests}}`, scaffolding scaled to difficulty. The user writes code in their own repo. "Run tests" → agent runs the chosen language's tests via shell within the call (no backgrounding) → `{pass/fail, output}`. Hints provided only on request.
-6. **Agent Invoker** — The single chokepoint. Builds prompts from owned templates, calls `claude --bare -p ... --output-format json --json-schema`, validates/parses JSON, retries on transient failure, surfaces clean errors. An interface; mockable in tests.
+6. **Agent Invoker** — The single chokepoint. Builds prompts from owned templates, calls `claude -p ... --output-format json --json-schema`, validates/parses JSON, retries on transient failure, surfaces clean errors. An interface; mockable in tests.
+   - **`--bare` note:** despite the docs recommending `--bare` for scripts, end-to-end testing (2026-06-25) showed `--bare` forces API-key auth and breaks Claude subscription/OAuth. It is intentionally omitted; `--output-format json` alone yields a single machine-readable JSON object. Trade-off: without `--bare`, the user's hooks/plugins/MCP load, which is slightly less deterministic — acceptable to keep subscription auth working.
 
 ## 6. Data Flow
 

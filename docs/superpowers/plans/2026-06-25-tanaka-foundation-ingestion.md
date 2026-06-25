@@ -4,7 +4,7 @@
 
 **Goal:** Build the foundation of Tanaka — project scaffold, persistent store, the agent-invocation boundary, and content ingestion — so that `tanaka add <file|url|->` ingests technical content into structured, stored sections and `tanaka list` shows them.
 
-**Architecture:** A single Go binary owns all state and orchestration. Ingestion reads raw bytes (file/URL/stdin), hands them to an `Invoker` boundary that shells out to `claude --bare -p` for structuring into sections, and persists the result in SQLite under `~/.tanaka/`. The `Invoker` is an interface so tests use a fake and never spend tokens.
+**Architecture:** A single Go binary owns all state and orchestration. Ingestion reads raw bytes (file/URL/stdin), hands them to an `Invoker` boundary that shells out to `claude -p` for structuring into sections, and persists the result in SQLite under `~/.tanaka/`. The `Invoker` is an interface so tests use a fake and never spend tokens. (Note: `--bare` was specified in Task 3 below but removed during Task 8 e2e testing — it breaks subscription/OAuth auth. See Task 3.)
 
 **Tech Stack:** Go 1.26, `modernc.org/sqlite` (pure-Go SQLite, no cgo → single static binary), Go standard library for HTTP/CLI/JSON. The `claude` CLI is an external runtime dependency invoked as a subprocess.
 
@@ -639,7 +639,9 @@ type envelope struct {
 
 // Invoke runs the job and returns its structured_output payload.
 func (c *Claude) Invoke(ctx context.Context, job Job) (json.RawMessage, error) {
-	args := []string{"--bare", "-p", job.Prompt, "--output-format", "json"}
+	// NOTE: --bare was removed during e2e testing — it forces API-key auth and
+	// breaks Claude subscription/OAuth. --output-format json still yields clean JSON.
+	args := []string{"-p", job.Prompt, "--output-format", "json"}
 	if job.Schema != "" {
 		args = append(args, "--json-schema", job.Schema)
 	}
