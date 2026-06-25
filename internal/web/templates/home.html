@@ -1,0 +1,16 @@
+{{define "content"}}
+<div class="window" style="max-width:640px">
+  <div class="title-bar"><div class="title-bar-text">Tanaka - Sources</div></div>
+  <div class="window-body">
+    {{if not .Sources}}
+      <p>No sources yet. Add one from the CLI: <code>tanaka add &lt;file|url|-&gt;</code></p>
+    {{else}}
+    <ul class="tree-view">
+      {{range .Sources}}
+      <li><a href="/study/{{.ID}}">{{.Title}}</a> &mdash; {{.Done}}/{{.Total}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+  </div>
+</div>
+{{end}}
