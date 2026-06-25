@@ -13,6 +13,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/app"
 	"github.com/devandbenz/tanaka/internal/ingest"
 	"github.com/devandbenz/tanaka/internal/store"
+	"github.com/devandbenz/tanaka/internal/study"
 	"github.com/devandbenz/tanaka/internal/ui"
 )
 
@@ -27,6 +28,7 @@ Commands:
   add <file|url|->   Import content from a file, a URL, or stdin (-)
   list               List imported sources
   remove <id>        Remove an imported source (and its sections)
+  prepare <id>       Generate the study package for a source (quizzes etc.)
   version            Print the version
   help               Show this help
 
@@ -99,6 +101,8 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdList(ctx, d, stdout, stderr)
 	case "remove":
 		return cmdRemove(ctx, args[1:], d, stdout, stderr)
+	case "prepare":
+		return cmdPrepare(ctx, args[1:], d, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\nrun 'tanaka help' for usage\n", args[0])
 		return 2
@@ -149,6 +153,35 @@ func cmdRemove(ctx context.Context, args []string, d deps, stdout, stderr io.Wri
 		return 1
 	}
 	fmt.Fprintf(stdout, "removed %s\n", args[0])
+	return 0
+}
+
+func cmdPrepare(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka prepare <id>")
+		return 2
+	}
+	if err := d.invoker.Check(ctx); err != nil {
+		fmt.Fprintf(stderr, "claude CLI unavailable: %v\nis it installed and logged in? try: claude login\n", err)
+		return 1
+	}
+	src, err := d.store.GetSource(ctx, args[0])
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", args[0])
+			return 1
+		}
+		fmt.Fprintf(stderr, "prepare: %v\n", err)
+		return 1
+	}
+	onSection := func(i, total int, title string) {
+		fmt.Fprintf(stderr, "preparing section %d/%d: %s\n", i+1, total, title)
+	}
+	if err := study.PrepareSource(ctx, d.invoker, d.store, src, d.newID, onSection); err != nil {
+		fmt.Fprintf(stderr, "prepare: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "prepared %q (%d sections)\n", src.Title, len(src.Sections))
 	return 0
 }
 
