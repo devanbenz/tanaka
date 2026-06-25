@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/app"
@@ -228,7 +229,9 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 	go func() {
 		<-ctx.Done()
-		httpSrv.Shutdown(context.Background())
+		shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		httpSrv.Shutdown(shutCtx)
 	}()
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintf(stderr, "serve: %v\n", err)

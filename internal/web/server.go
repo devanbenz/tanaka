@@ -113,7 +113,11 @@ func (s *Server) handleStudyEntry(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	prepared, err := s.store.IsPrepared(ctx, id)
@@ -139,7 +143,11 @@ func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if err := study.PrepareSource(ctx, s.inv, s.store, src, s.newID, nil); err != nil {
@@ -255,7 +263,11 @@ func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 	}
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if idx < 0 || idx >= len(src.Sections) {
@@ -314,7 +326,11 @@ func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
 	}
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if idx < 0 || idx >= len(src.Sections) {
