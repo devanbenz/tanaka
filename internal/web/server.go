@@ -52,6 +52,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
 	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
 	mux.HandleFunc("POST /grade", s.handleGrade)
+	mux.HandleFunc("POST /study/{id}/{idx}/skip", s.handleSkip)
 	return mux
 }
 
@@ -242,6 +243,46 @@ func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error 
 		}
 	}
 	return nil
+}
+
+func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	idx, err := strconv.Atoi(r.PathValue("idx"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if idx < 0 || idx >= len(src.Sections) {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.store.SetSectionStatus(ctx, src.Sections[idx].ID, model.StatusSkipped); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	next := idx + 1
+	if next < len(src.Sections) {
+		statuses, err := s.store.GetSectionStatuses(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if statuses[src.Sections[next].ID] == model.StatusLocked {
+			if err := s.store.SetSectionStatus(ctx, src.Sections[next].ID, model.StatusUnlocked); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		http.Redirect(w, r, "/study/"+id+"/"+itoa(next), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/study/"+id+"/"+itoa(idx), http.StatusSeeOther)
 }
 
 type navItem struct {

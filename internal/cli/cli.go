@@ -4,8 +4,10 @@ package cli
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
 	"github.com/devandbenz/tanaka/internal/ui"
+	"github.com/devandbenz/tanaka/internal/web"
 )
 
 const version = "0.0.1"
@@ -29,6 +32,7 @@ Commands:
   list               List imported sources
   remove <id>        Remove an imported source (and its sections)
   prepare <id>       Generate the study package for a source (quizzes etc.)
+  serve [--port N]   Start the local study web UI (default 127.0.0.1:7777)
   version            Print the version
   help               Show this help
 
@@ -103,6 +107,8 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdRemove(ctx, args[1:], d, stdout, stderr)
 	case "prepare":
 		return cmdPrepare(ctx, args[1:], d, stdout, stderr)
+	case "serve":
+		return cmdServe(ctx, args[1:], d, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\nrun 'tanaka help' for usage\n", args[0])
 		return 2
@@ -197,6 +203,33 @@ func cmdList(ctx context.Context, d deps, stdout, stderr io.Writer) int {
 	}
 	for _, s := range sources {
 		fmt.Fprintf(stdout, "%s  %s  (%s)\n", s.ID, s.Title, s.Origin)
+	}
+	return 0
+}
+
+func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	port := fs.Int("port", 7777, "port to listen on")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *port <= 0 || *port > 65535 {
+		fmt.Fprintf(stderr, "invalid port %d (must be 1-65535)\n", *port)
+		return 2
+	}
+	srv, err := web.NewServer(d.store, d.invoker, d.newID)
+	if err != nil {
+		fmt.Fprintf(stderr, "serve: %v\n", err)
+		return 1
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", *port)
+	fmt.Fprintf(stdout, "Tanaka study UI on http://%s  (Ctrl-C to stop)\n", addr)
+	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
+	go func() { <-ctx.Done(); httpSrv.Close() }()
+	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintf(stderr, "serve: %v\n", err)
+		return 1
 	}
 	return 0
 }
