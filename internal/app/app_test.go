@@ -33,4 +33,19 @@ func TestNewIDUniqueAndHex(t *testing.T) {
 	if strings.ContainsAny(a, "ghijklmnopqrstuvwxyz") {
 		t.Fatalf("id %q is not hex", a)
 	}
+	if strings.ContainsAny(b, "ghijklmnopqrstuvwxyz") {
+		t.Fatalf("id %q is not hex", b)
+	}
+}
+
+func TestDBPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	p, err := DBPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p != filepath.Join(home, ".tanaka", "tanaka.db") {
+		t.Fatalf("DBPath = %q", p)
+	}
 }

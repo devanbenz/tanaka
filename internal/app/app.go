@@ -26,7 +26,7 @@ func DataDir() (string, error) {
 func DBPath() (string, error) {
 	dir, err := DataDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("db path: %w", err)
 	}
 	return filepath.Join(dir, "tanaka.db"), nil
 }
