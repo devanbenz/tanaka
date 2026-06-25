@@ -38,7 +38,10 @@ func NewServer(st store.Store, inv agent.Invoker, newID func() string) (*Server,
 // Handler returns the HTTP router.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	sub, _ := fs.Sub(assetsFS, "assets")
+	sub, err := fs.Sub(assetsFS, "assets")
+	if err != nil {
+		panic("web: assets sub-FS: " + err.Error())
+	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(sub)))
 	mux.HandleFunc("GET /{$}", s.handleHome)
 	return mux
