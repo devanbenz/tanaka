@@ -52,7 +52,7 @@ func (c *Claude) Invoke(ctx context.Context, job Job) (json.RawMessage, error) {
 	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
 		return nil, fmt.Errorf("parse claude output: %w; raw: %s", err, stdout.String())
 	}
-	if len(env.StructuredOutput) == 0 {
+	if len(env.StructuredOutput) == 0 || string(env.StructuredOutput) == "null" {
 		return nil, fmt.Errorf("claude returned no structured_output; result: %s", env.Result)
 	}
 	return env.StructuredOutput, nil

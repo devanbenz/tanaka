@@ -46,6 +46,15 @@ func TestClaudeInvokeReturnsStructuredOutput(t *testing.T) {
 	}
 }
 
+func TestClaudeInvokeRejectsNullStructuredOutput(t *testing.T) {
+	stub := writeStubClaude(t, `null`)
+	c := NewClaude(stub)
+	_, err := c.Invoke(context.Background(), Job{Prompt: "hi", Schema: ""})
+	if err == nil {
+		t.Fatal("expected error when structured_output is null")
+	}
+}
+
 func TestFakeInvokerMatchesOnPromptSubstring(t *testing.T) {
 	f := &Fake{Responses: map[string]json.RawMessage{
 		"structure": json.RawMessage(`{"ok":true}`),
