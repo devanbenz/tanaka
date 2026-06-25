@@ -55,3 +55,64 @@ type SectionStudy struct {
 	KeyConcepts []string
 	Questions   []Question
 }
+
+// Build languages (also the strings stored in builds.language).
+const (
+	LangRust   = "rust"
+	LangGo     = "go"
+	LangCPP    = "cpp"
+	LangC      = "c"
+	LangPython = "python"
+)
+
+// Build difficulties (stored in builds.difficulty).
+const (
+	DiffGuided    = "guided"
+	DiffSpecTests = "spec+tests"
+	DiffBlank     = "blank-page"
+)
+
+// ValidLanguage reports whether s is a supported build language.
+func ValidLanguage(s string) bool {
+	switch s {
+	case LangRust, LangGo, LangCPP, LangC, LangPython:
+		return true
+	}
+	return false
+}
+
+// ValidDifficulty reports whether s is a supported build difficulty.
+func ValidDifficulty(s string) bool {
+	switch s {
+	case DiffGuided, DiffSpecTests, DiffBlank:
+		return true
+	}
+	return false
+}
+
+// BuildFile is one file the agent generates into the build workspace.
+type BuildFile struct {
+	Path    string
+	Content string
+}
+
+// BuildStep is one ordered step of a build plan.
+type BuildStep struct {
+	ID      string
+	BuildID string
+	Idx     int
+	Goal    string
+	Files   []BuildFile // written into the workspace when the step activates
+	Status  string
+}
+
+// Build is a per-source, per-language implementation exercise.
+type Build struct {
+	ID         string
+	SourceID   string
+	Language   string
+	Difficulty string
+	Workspace  string
+	CreatedAt  time.Time
+	Steps      []BuildStep
+}
