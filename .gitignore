@@ -1,10 +1,9 @@
-# Tanaka
+# build output
+/tanaka
 
-A local tool that turns technical content into a study-then-build learning flow.
-
+# local data store
 /.tanaka/
-tanaka
 *.db
 
-# Subagent-driven-development scratch (ledger, briefs, reports, diffs)
+# subagent-driven-development scratch (ledger, briefs, reports, diffs)
 .superpowers/

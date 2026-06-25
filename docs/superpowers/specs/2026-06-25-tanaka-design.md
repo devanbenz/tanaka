@@ -68,13 +68,13 @@ The Go binary owns all state and sequencing. Every "smart" task is a stateless h
 
 Each component has one clear purpose and is independently testable.
 
-1. **Ingestion** — Accepts a file (PDF/HTML/Markdown/txt), a URL, or stdin. Go fetches/reads raw bytes; a `structure` agent call normalizes to clean Markdown, splits into ordered sections, and marks natural informational points. Output: `Source{id, title, origin, sections[]}`.
+1. **Ingestion** — Accepts a file (PDF/HTML/Markdown/txt), a URL, or stdin (`-`). The agent reads the source itself so content never passes through `argv` (argv cannot hold NUL bytes or huge payloads — this crashed on binary PDFs): a **file** is read by the agent's `Read` tool (handles PDFs/large files), a **URL** by its `WebFetch` tool, and **stdin/pasted text** is piped to the agent's stdin. The agent normalizes to clean Markdown, splits into ordered sections, and marks natural informational points. Output: `Source{id, title, origin, sections[]}` (origin = absolute file path, URL, or "stdin"). Verified e2e 2026-06-25: a 720K binary PDF ingests into sections.
 2. **Study-package generator** (batch) — For each section, a `gen-study` call produces `{summary, key_concepts[], questions[]}`. Question types: recall, prediction, teach-it-back, trace-the-path. Stored statically; pre-generated so reading is snappy.
 3. **Web UI + server** — Browse sources; read a section; answer questions inline; see progress. The next section is gated until the current section's quiz is passed (skippable). Also hosts the build-phase UI (language + difficulty selection, step view, run-tests, hints).
    - **Aesthetic (hard requirement):** retro desktop-GUI look in the spirit of Windows 95 — beveled/3D widgets, title bars, system/pixel fonts, solid colors, chunky tactile buttons. Explicitly **not** the default "LLM UI" style (gradient heroes, rounded cards, heavy whitespace, Inter/SaaS look). A library like 98.css/7.css or hand-rolled CSS is acceptable; keep it simple and pleasing.
 4. **Live grading** — On answer submit: `POST /grade` → `grade-answer` call → `{verdict: pass|partial|fail, feedback, followup?}`. On pass, unlock next section and persist progress.
 5. **Build engine** — On build start: `gen-build` call → `BuildPlan{steps[]: {goal, scaffold, acceptance_tests}}`, scaffolding scaled to difficulty. The user writes code in their own repo. "Run tests" → agent runs the chosen language's tests via shell within the call (no backgrounding) → `{pass/fail, output}`. Hints provided only on request.
-6. **Agent Invoker** — The single chokepoint. Builds prompts from owned templates, calls `claude -p ... --output-format json --json-schema`, validates/parses JSON, retries on transient failure, surfaces clean errors. An interface; mockable in tests.
+6. **Agent Invoker** — The single chokepoint. Builds prompts from owned templates, calls `claude -p ... --output-format json --json-schema [--allowedTools ...]`, pipes any large/binary content via the process's **stdin** (never `argv`), validates/parses JSON, retries on transient failure, surfaces clean errors. An interface; mockable in tests. `agent.Job` carries `{Prompt, Schema, Stdin, AllowedTools}`.
    - **`--bare` note:** despite the docs recommending `--bare` for scripts, end-to-end testing (2026-06-25) showed `--bare` forces API-key auth and breaks Claude subscription/OAuth. It is intentionally omitted; `--output-format json` alone yields a single machine-readable JSON object. Trade-off: without `--bare`, the user's hooks/plugins/MCP load, which is slightly less deterministic — acceptable to keep subscription auth working.
 
 ## 6. Data Flow
@@ -82,8 +82,9 @@ Each component has one clear purpose and is independently testable.
 **Ingest**
 ```
 tanaka add <file|url|->
-  → Go reads/fetches raw bytes
-  → Agent Invoker "structure" → clean markdown + ordered sections + info-points
+  → classify input: file → agent Read tool | url → agent WebFetch | stdin → piped bytes
+  → Agent Invoker "structure" (content read by agent or piped; never via argv)
+      → clean markdown + ordered sections + info-points
   → store Source in ~/.tanaka/
   → for each section: "gen-study" → {summary, key_concepts, questions}  (cached)
 ```
