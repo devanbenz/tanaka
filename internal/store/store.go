@@ -23,6 +23,9 @@ type Store interface {
 	GetSectionStatuses(ctx context.Context, sourceID string) (map[string]string, error)
 	SetSectionStatus(ctx context.Context, sectionID, status string) error
 	GetQuestion(ctx context.Context, questionID string) (*model.Question, error)
+	GetSection(ctx context.Context, sectionID string) (*model.Section, error)
+	SetQuestionVerdict(ctx context.Context, questionID, verdict string) error
+	SectionSatisfied(ctx context.Context, sectionID string) (bool, error)
 	Close() error
 }
 
@@ -61,5 +64,9 @@ CREATE INDEX IF NOT EXISTS idx_questions_section ON questions(section_id, idx);
 CREATE TABLE IF NOT EXISTS section_progress (
 	section_id TEXT PRIMARY KEY REFERENCES sections(id) ON DELETE CASCADE,
 	status     TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS question_progress (
+	question_id TEXT PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE,
+	verdict     TEXT NOT NULL
 );
 `

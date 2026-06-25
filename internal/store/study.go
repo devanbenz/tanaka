@@ -163,3 +163,45 @@ func (s *sqliteStore) GetQuestion(ctx context.Context, questionID string) (*mode
 	q.Explanation = expl.String
 	return &q, nil
 }
+
+func (s *sqliteStore) GetSection(ctx context.Context, sectionID string) (*model.Section, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, source_id, idx, title, markdown FROM sections WHERE id = ?`, sectionID)
+	var sec model.Section
+	if err := row.Scan(&sec.ID, &sec.SourceID, &sec.Idx, &sec.Title, &sec.Markdown); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get section %s: %w", sectionID, err)
+	}
+	return &sec, nil
+}
+
+func (s *sqliteStore) SetQuestionVerdict(ctx context.Context, questionID, verdict string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO question_progress (question_id, verdict) VALUES (?, ?)
+		 ON CONFLICT(question_id) DO UPDATE SET verdict=excluded.verdict`, questionID, verdict)
+	if err != nil {
+		return fmt.Errorf("set verdict %s: %w", questionID, err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) SectionSatisfied(ctx context.Context, sectionID string) (bool, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM questions WHERE section_id = ?`, sectionID).Scan(&total); err != nil {
+		return false, fmt.Errorf("count questions: %w", err)
+	}
+	if total == 0 {
+		return true, nil
+	}
+	var nonFail int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM question_progress qp
+		 JOIN questions q ON q.id = qp.question_id
+		 WHERE q.section_id = ? AND qp.verdict != 'fail'`, sectionID).Scan(&nonFail); err != nil {
+		return false, fmt.Errorf("count satisfied: %w", err)
+	}
+	return nonFail == total, nil
+}
