@@ -37,6 +37,9 @@ type envelope struct {
 
 // Invoke runs the job and returns its structured_output payload.
 func (c *Claude) Invoke(ctx context.Context, job Job) (json.RawMessage, error) {
+	// Note: --bare is intentionally omitted. It forces API-key auth and breaks
+	// Claude subscription/OAuth. --output-format json still yields a single
+	// machine-readable JSON object for the envelope decode below.
 	args := []string{"-p", job.Prompt, "--output-format", "json"}
 	if job.Schema != "" {
 		args = append(args, "--json-schema", job.Schema)
