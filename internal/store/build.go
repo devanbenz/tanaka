@@ -77,17 +77,14 @@ func (s *sqliteStore) SetBuildStepStatus(ctx context.Context, stepID, status str
 func (s *sqliteStore) GetBuildStep(ctx context.Context, stepID string) (*model.BuildStep, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT build_id, id, idx, goal, files_json, status FROM build_steps WHERE id = ?`, stepID)
-	var buildID string
-	if err := row.Scan(&buildID, new(string), new(int), new(string), new(string), new(string)); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("get build step: %w", err)
+	st, err := scanStepRow(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
 	}
-	// Re-query through the shared scanner for consistent decoding.
-	r := s.db.QueryRowContext(ctx,
-		`SELECT id, idx, goal, files_json, status FROM build_steps WHERE id = ?`, stepID)
-	return scanStepRow(r, buildID)
+	if err != nil {
+		return nil, fmt.Errorf("get build step %s: %w", stepID, err)
+	}
+	return st, nil
 }
 
 // scanStep decodes a build_steps row (id, idx, goal, files_json, status) from *sql.Rows.
@@ -104,14 +101,13 @@ func scanStep(rows *sql.Rows, buildID string) (*model.BuildStep, error) {
 	return &st, nil
 }
 
-// scanStepRow decodes the same columns from a *sql.Row.
-func scanStepRow(row *sql.Row, buildID string) (*model.BuildStep, error) {
+// scanStepRow decodes a build_steps row (build_id, id, idx, goal, files_json, status) from a *sql.Row.
+func scanStepRow(row *sql.Row) (*model.BuildStep, error) {
 	var st model.BuildStep
 	var files string
-	if err := row.Scan(&st.ID, &st.Idx, &st.Goal, &files, &st.Status); err != nil {
-		return nil, fmt.Errorf("scan build step: %w", err)
+	if err := row.Scan(&st.BuildID, &st.ID, &st.Idx, &st.Goal, &files, &st.Status); err != nil {
+		return nil, err
 	}
-	st.BuildID = buildID
 	if err := json.Unmarshal([]byte(files), &st.Files); err != nil {
 		return nil, fmt.Errorf("unmarshal files: %w", err)
 	}
