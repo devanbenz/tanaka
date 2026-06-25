@@ -5,11 +5,12 @@ import "github.com/devandbenz/tanaka/internal/model"
 
 // ComputeUnlocked returns, for each section in order, whether it is reachable.
 // Section 0 is always reachable; section i>0 is reachable iff section i-1 is
-// passed or skipped.
+// passed or skipped, or the section itself is already passed/skipped/unlocked.
 func ComputeUnlocked(statuses []string) []bool {
 	out := make([]bool, len(statuses))
-	for i := range statuses {
-		if i == 0 {
+	for i, status := range statuses {
+		reached := status == model.StatusPassed || status == model.StatusSkipped || status == model.StatusUnlocked
+		if i == 0 || reached {
 			out[i] = true
 			continue
 		}
