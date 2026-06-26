@@ -11,5 +11,7 @@ body { background: #008080; padding: 16px; font-family: Arial, sans-serif; }
 .markdown h2 { font-size: 1.15em; margin: 0.4em 0; }
 .markdown h3 { font-size: 1.05em; margin: 0.4em 0; }
 .markdown h4, .markdown h5, .markdown h6 { font-size: 1em; margin: 0.4em 0; }
+.home-nav { margin-bottom: 8px; }
+.home-nav a { color: #fff; font-weight: bold; }
 .quiz { margin-top: 12px; }
 .verdict { margin-top: 6px; }
