@@ -34,6 +34,7 @@ Three improvements to the web server:
 | Completion UX | Global toast (polls `/jobs` on every page) + in-progress pages that auto-redirect |
 | Logging | `log/slog` text handler → stderr; request middleware + operation/error logs; level info |
 | Dedup | One job per key (`prepare:<id>`, `build:<id>:<lang>`); a start while running is a no-op |
+| Loading indicator | Animated kaomoji — each cycles through its own frames; a *different random* kaomoji is chosen every few seconds. Shared idea across the CLI spinner and all web loading states (buttons, in-progress pages). |
 
 ## 4. Components
 
@@ -42,6 +43,8 @@ Three improvements to the web server:
 - `internal/web/server.go` — `Server` gains `*slog.Logger` and `*JobManager`; `prepare`/`build` handlers become async; new `GET /jobs`; in-progress branches in the study/build entry handlers.
 - `internal/web/templates/` — `preparing.html`, `building.html` in-progress pages; toast markup is created by JS.
 - `internal/web/assets/jobs.js` — global poller + toast; loaded in `base.html`.
+- `internal/web/assets/kaomoji.js` — shared animated-kaomoji helper (the curated set + animate-frames + rotate-every-few-seconds); used by button loading text, the in-progress pages, and `jobs.js`. Loaded in `base.html` before the others.
+- `internal/ui/progress.go` — enhance the existing CLI `Spinner` (used by `tanaka add`) to use the same curated kaomoji set: animate the current kaomoji's frames and switch to a different random kaomoji every few seconds.
 - `internal/cli/cli.go` (`cmdServe`) — construct the `slog.Logger` and pass it to `NewServer`.
 
 ## 5. Logging
@@ -80,9 +83,21 @@ type JobManager struct { /* mu sync.Mutex; jobs map[string]*Job; log *slog.Logge
 
 ## 8. UI Feedback, Polling & Toast
 
-- **Buttons:** Prepare and Start forms disable the button + set its text to "starting…" on submit (instant, since POST now returns fast).
-- **In-progress pages** (`preparing.html`, `building.html`): show the current `Progress` and poll `GET /jobs` (~2s); when the relevant job is `done` they reload/redirect to the ready page; on `error` they show the message + a retry link.
+- **Buttons:** Prepare and Start forms disable the button on submit and replace its label with an **animated kaomoji** (per §8.1) instead of static "starting…".
+- **In-progress pages** (`preparing.html`, `building.html`): show the current `Progress` next to an **animated kaomoji**, and poll `GET /jobs` (~2s); when the relevant job is `done` they reload/redirect to the ready page; on `error` they show the message + a retry link.
 - **Global toast** (`jobs.js`, loaded by `base.html` on every page): polls `GET /jobs` (~2s); when a job it hasn't announced flips to `done`/`error`, render a small retro toast (98.css `window`, fixed bottom-right) — "<title>: study package ready" / "build ready" / "prepare failed". Announced job keys are remembered in `localStorage` so reloads don't re-toast. (Toast shows the source title when available; falls back to the source id.)
+
+### 8.1 Animated kaomoji loading indicator
+
+A small curated set of kaomoji, each defined as an ordered list of frames that read as motion, e.g.:
+- `┌(･o･)┘ └(･o･)┐ ┌(･o･)┐ └(･o･)┘` (dancing)
+- `(・_・) (・_・ ) ( ・_・) (・_・)` (looking around)
+- `┐(･ω･)┌ ┌(･ω･)┐` (shrug)
+- `(>_<) (>ω<) (>﹏<)` (effort)
+
+Behavior anywhere a "working" state is shown: animate the **current** kaomoji by advancing its frames quickly (~150–200ms), and every few seconds (~3s) switch to a **different random** kaomoji from the set. Two implementations of the same idea:
+- **Web** (`kaomoji.js`): exposes a helper that, given a target DOM element, starts this animation and returns a stop handle. Button loading and the in-progress pages use it.
+- **CLI** (`internal/ui/progress.go`): the existing `Spinner` already animates one fixed kaomoji's frames; extend it to hold the curated set, animate the current kaomoji's frames, and rotate to a random different kaomoji every ~3s. Non-TTY output is unchanged (plain phase lines, no animation). Randomness uses `math/rand` (seeded per spinner); frame/rotation selection is factored into a small pure helper so it's testable.
 
 ## 9. Data / State
 
@@ -103,6 +118,7 @@ Agent + runner stay faked; logger over `io.Discard`.
 - **`GET /jobs`:** returns the registered jobs as JSON with expected fields.
 - **Request logging middleware:** capture slog output (text handler over a buffer), assert a `request …status=… dur=…` line.
 - **Templates:** `preparing.html`/`building.html` render.
+- **CLI kaomoji (`internal/ui`):** the curated kaomoji set is non-empty and every kaomoji has ≥1 non-empty frame; the pure frame/rotation-selection helper behaves (advances frames; rotation picks an in-range, different index); non-TTY `Spinner` output is unchanged (still plain phase lines). `kaomoji.js` is client JS and is exercised manually, not unit-tested in Go.
 
 ## 12. Open Questions / Future
 
