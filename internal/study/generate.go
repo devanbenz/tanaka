@@ -36,7 +36,7 @@ const studySchema = `{
 }`
 
 func studyPrompt() string {
-	return "You are building a study package for the section on stdin. Produce a short " +
+	return "You are building a study package for the technical content provided to you. Produce a short " +
 		"summary, a list of key concepts, and a mix of quiz questions: at least one " +
 		"multiple-choice (mcq, with options, a correct_index, and an explanation) and at " +
 		"least one free-response (free, with a grading rubric). Return the study package."

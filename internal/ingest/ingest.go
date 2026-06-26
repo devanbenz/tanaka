@@ -52,7 +52,7 @@ func urlPrompt(url string) string {
 }
 
 func stdinPrompt() string {
-	return "The technical content to study is provided on your standard input. " + studyInstruction
+	return "The technical content to study is provided to you. " + studyInstruction
 }
 
 type structureResult struct {

@@ -38,7 +38,7 @@ type StepGen struct {
 
 func buildPrompt(language, difficulty string) string {
 	return "You are designing a hands-on build plan that has the learner implement the " +
-		"technical content on stdin in " + language + ". Difficulty: " + difficulty +
+		"technical content provided to you, in " + language + ". Difficulty: " + difficulty +
 		" (guided = starter code + comments; spec+tests = stubs + tests; blank-page = goal + tests only). " +
 		"Produce a language-appropriate project: skeleton_files (project files like go.mod/Cargo.toml/Makefile) " +
 		"and an ordered list of steps, each with a goal and files (its acceptance tests plus difficulty-scaled " +

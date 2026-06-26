@@ -34,7 +34,7 @@ func GradeChoice(q *model.Question, choice int) Verdict {
 
 func gradePrompt(q *model.Question) string {
 	return "You are grading a learner's free-response answer for understanding. " +
-		"The section text and the learner's answer are on stdin. " +
+		"The section text and the learner's answer are provided to you. " +
 		"Question: " + q.Prompt + "\nRubric: " + q.Rubric + "\n" +
 		"Please grade: decide pass, partial, or fail and give one or two sentences of feedback."
 }

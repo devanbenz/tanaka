@@ -12,7 +12,7 @@ const hintSchema = `{"type":"object","required":["hint"],"properties":{"hint":{"
 
 func hintPrompt(goal string) string {
 	return "Give a single short hint (a nudge, not the solution) for this build step. " +
-		"The learner's current code and the failing test output are on stdin. " +
+		"The learner's current code and the failing test output are provided to you. " +
 		"Step goal: " + goal
 }
 
