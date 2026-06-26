@@ -8,3 +8,6 @@ docs/
 
 # subagent-driven-development scratch (ledger, briefs, reports, diffs)
 .superpowers/
+
+# Stray agent worktrees
+.claude/worktrees/
