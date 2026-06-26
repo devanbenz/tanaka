@@ -11,7 +11,7 @@
       <fieldset><legend>Difficulty</legend>
         {{range .Difficulties}}<div class="field-row"><input type="radio" id="diff-{{.}}" name="difficulty" value="{{.}}"><label for="diff-{{.}}">{{.}}</label></div>{{end}}
       </fieldset>
-      <div class="field-row"><button type="submit">Start</button></div>
+      <div class="field-row"><button type="submit" onclick="var b=this;setTimeout(function(){b.disabled=true;b.textContent='';b.classList.add('kaomoji');window.startKaomoji(b);},0);">Start</button></div>
     </form>
   </div>
 </div>

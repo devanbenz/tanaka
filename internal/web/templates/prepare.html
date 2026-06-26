@@ -5,7 +5,7 @@
     <p>This source has not been prepared yet. Preparing generates a summary and
        quiz for each of its {{len .Source.Sections}} sections. This can take a
        minute and uses your Claude subscription.</p>
-    <form method="POST" action="/study/{{.Source.ID}}/prepare" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='preparing...'">
+    <form method="POST" action="/study/{{.Source.ID}}/prepare" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='';b.classList.add('kaomoji');window.startKaomoji(b);">
       <button type="submit">Prepare this source</button>
     </form>
   </div>
