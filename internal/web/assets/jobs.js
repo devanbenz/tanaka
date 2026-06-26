@@ -52,7 +52,10 @@ async function pollJobs() {
     if (me) {
       const p = document.getElementById("progress");
       if (p && me.progress) p.textContent = me.progress;
-      if (me.done && me.status === "done") { location.href = window.__pollJob.redirect; }
+      if (me.done) {
+        if (me.status === "done") { location.href = window.__pollJob.redirect; }
+        else { location.reload(); }
+      }
     }
   }
 }

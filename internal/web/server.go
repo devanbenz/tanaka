@@ -149,9 +149,15 @@ func (s *Server) handleStudyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !prepared {
-		if j, ok := s.jobs.Get("prepare:" + id); ok && j.Status == "running" {
-			s.render(w, "preparing.html", map[string]any{"Title": src.Title, "SourceID": id, "Progress": j.Progress})
-			return
+		if j, ok := s.jobs.Get("prepare:" + id); ok {
+			if j.Status == "running" {
+				s.render(w, "preparing.html", map[string]any{"Title": src.Title, "SourceID": id, "Progress": j.Progress})
+				return
+			}
+			if j.Status == "error" {
+				s.render(w, "preparing.html", map[string]any{"Title": src.Title, "SourceID": id, "Error": j.Err})
+				return
+			}
 		}
 		s.render(w, "prepare.html", map[string]any{"Title": src.Title, "Source": src})
 		return
@@ -401,9 +407,15 @@ func (s *Server) handleBuildView(w http.ResponseWriter, r *http.Request) {
 	b, err := s.store.GetBuild(ctx, id, lang)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			if j, ok := s.jobs.Get("build:" + id + ":" + lang); ok && j.Status == "running" {
-				s.render(w, "building.html", map[string]any{"Title": id, "SourceID": id, "Lang": lang, "Progress": j.Progress})
-				return
+			if j, ok := s.jobs.Get("build:" + id + ":" + lang); ok {
+				if j.Status == "running" {
+					s.render(w, "building.html", map[string]any{"Title": id, "SourceID": id, "Lang": lang, "Progress": j.Progress})
+					return
+				}
+				if j.Status == "error" {
+					s.render(w, "building.html", map[string]any{"Title": id, "SourceID": id, "Lang": lang, "Error": j.Err})
+					return
+				}
 			}
 			http.NotFound(w, r)
 			return

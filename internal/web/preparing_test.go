@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +21,21 @@ func TestPrepareStartsJobAndShowsPreparing(t *testing.T) {
 	}
 	// The job exists and finishes.
 	waitJob(t, srv.jobs, "prepare:src1")
+}
+
+func TestStudyEntryShowsErrorWhenPrepareFailed(t *testing.T) {
+	srv, st := testServer(t)
+	addSource(t, st, "src1", 1)
+	srv.jobs.Start("prepare:src1", "prepare", "src1", "", func(progress func(string)) error {
+		return errors.New("kaboom")
+	})
+	waitJob(t, srv.jobs, "prepare:src1")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/study/src1", nil))
+	body := rec.Body.String()
+	if !strings.Contains(body, "kaboom") || !strings.Contains(body, "Retry") {
+		t.Fatalf("expected error + retry, got %q", body)
+	}
 }
 
 func TestStudyEntryShowsPreparingWhileRunning(t *testing.T) {

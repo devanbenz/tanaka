@@ -2,12 +2,15 @@
 <div class="window" style="max-width:520px">
   <div class="title-bar"><div class="title-bar-text">Preparing - {{.Title}}</div></div>
   <div class="window-body">
+  {{if .Error}}
+    <p>Preparing failed: {{.Error}}</p>
+    <form method="POST" action="/study/{{.SourceID}}/prepare"><button type="submit">Retry</button></form>
+  {{else}}
     <p>Preparing your study package. You can leave this page — it keeps working,
        and a notification appears when it's ready.</p>
     <p><span class="kaomoji" data-kaomoji="1">...</span> <span id="progress">{{.Progress}}</span></p>
+    <script>window.__pollJob = {key: "prepare:{{.SourceID}}", redirect: "/study/{{.SourceID}}"};</script>
+  {{end}}
   </div>
 </div>
-<script>
-  window.__pollJob = {key: "prepare:{{.SourceID}}", redirect: "/study/{{.SourceID}}"};
-</script>
 {{end}}
