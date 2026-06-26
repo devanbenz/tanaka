@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -148,6 +149,10 @@ func (s *Server) handleStudyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !prepared {
+		if j, ok := s.jobs.Get("prepare:" + id); ok && j.Status == "running" {
+			s.render(w, "preparing.html", map[string]any{"Title": src.Title, "SourceID": id, "Progress": j.Progress})
+			return
+		}
 		s.render(w, "prepare.html", map[string]any{"Title": src.Title, "Source": src})
 		return
 	}
@@ -165,18 +170,14 @@ func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.NotFound(w, r)
 		return
 	}
-	if err := study.PrepareSource(ctx, s.inv, s.store, src, s.newID, nil); err != nil {
-		http.Error(w, "prepare failed: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/study/"+id+"/0", http.StatusSeeOther)
+	s.jobs.Start("prepare:"+id, "prepare", id, "", func(progress func(string)) error {
+		return study.PrepareSource(context.Background(), s.inv, s.store, src, s.newID,
+			func(i, total int, title string) { progress(fmt.Sprintf("section %d/%d", i+1, total)) })
+	})
+	http.Redirect(w, r, "/study/"+id, http.StatusSeeOther)
 }
 
 func itoa(i int) string { return strconv.Itoa(i) }

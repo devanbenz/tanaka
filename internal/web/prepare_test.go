@@ -59,15 +59,17 @@ func TestPrepareThenEntryRedirects(t *testing.T) {
 	srv, st := testServer(t)
 	srv.inv = studyFake() // server uses the fake invoker for PrepareSource
 	addSource(t, st, "src1", 2)
-	// Prepare.
+	// Prepare: now async — returns 303 to /study/src1 immediately.
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/study/src1/prepare", nil))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("prepare status = %d, want 303; body=%s", rec.Code, rec.Body.String())
 	}
-	if loc := rec.Header().Get("Location"); loc != "/study/src1/0" {
-		t.Fatalf("prepare redirect = %q, want /study/src1/0", loc)
+	if loc := rec.Header().Get("Location"); loc != "/study/src1" {
+		t.Fatalf("prepare redirect = %q, want /study/src1", loc)
 	}
+	// Wait for the background job to complete.
+	waitJob(t, srv.jobs, "prepare:src1")
 	// Now entry redirects to current section instead of the prepare page.
 	rec2 := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec2, httptest.NewRequest("GET", "/study/src1", nil))
