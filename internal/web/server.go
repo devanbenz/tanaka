@@ -8,7 +8,11 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/build"
@@ -60,6 +64,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /build/{id}", s.handleBuildStart)
 	mux.HandleFunc("GET /build/{id}/{lang}", s.handleBuildView)
 	mux.HandleFunc("POST /build/{id}/{lang}/test", s.handleBuildTest)
+	mux.HandleFunc("POST /build/{id}/{lang}/skip", s.handleBuildSkip)
+	mux.HandleFunc("POST /build/{id}/{lang}/hint", s.handleBuildHint)
 	return mux
 }
 
@@ -466,6 +472,84 @@ func (s *Server) handleBuildTest(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (s *Server) handleBuildSkip(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, lang := r.PathValue("id"), r.PathValue("lang")
+	b, err := s.store.GetBuild(ctx, id, lang)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cur := currentBuildStep(b)
+	if cur >= 0 {
+		if err := build.SkipStep(ctx, s.store, b, cur); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/build/"+id+"/"+lang, http.StatusSeeOther)
+}
+
+func (s *Server) handleBuildHint(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, lang := r.PathValue("id"), r.PathValue("lang")
+	b, err := s.store.GetBuild(ctx, id, lang)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cur := currentBuildStep(b)
+	if cur < 0 {
+		http.Error(w, "build complete", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Output string `json:"output"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	code := readWorkspaceText(b.Workspace)
+	hint, err := build.Hint(ctx, s.inv, b.Steps[cur].Goal, code, req.Output)
+	if err != nil {
+		http.Error(w, "hint unavailable", http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]string{"hint": hint})
+}
+
+// readWorkspaceText concatenates UTF-8 text files under ws (path-labelled),
+// capped to keep the agent prompt bounded; binary files are skipped.
+func readWorkspaceText(ws string) string {
+	const capBytes = 100_000
+	var sb strings.Builder
+	total := 0
+	filepath.WalkDir(ws, func(p string, de fs.DirEntry, err error) error {
+		if err != nil || de.IsDir() {
+			return nil
+		}
+		b, e := os.ReadFile(p)
+		if e != nil || !utf8.Valid(b) {
+			return nil
+		}
+		rel, _ := filepath.Rel(ws, p)
+		chunk := "=== " + rel + " ===\n" + string(b) + "\n"
+		if total+len(chunk) > capBytes {
+			return filepath.SkipAll
+		}
+		sb.WriteString(chunk)
+		total += len(chunk)
+		return nil
+	})
+	return sb.String()
 }
 
 func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
