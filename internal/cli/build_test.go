@@ -34,8 +34,8 @@ func TestBuildGeneratesWorkspace(t *testing.T) {
 func TestBuildRequiresIDAndLang(t *testing.T) {
 	d := testDeps(t)
 	var out, errOut bytes.Buffer
-	if code := run(context.Background(), []string{"build"}, d, &out, &errOut); code == 0 {
-		t.Fatal("expected non-zero exit when build has no id")
+	if code := run(context.Background(), []string{"build"}, d, &out, &errOut); code != 2 {
+		t.Fatalf("expected exit 2 when build has no id, got %d", code)
 	}
 	out.Reset()
 	errOut.Reset()

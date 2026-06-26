@@ -228,7 +228,7 @@ func cmdBuild(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		return 2
 	}
 	if !model.ValidLanguage(*lang) {
-		fmt.Fprintf(stderr, "invalid or missing --language (use rust|go|cpp|c|python)\n")
+		fmt.Fprintf(stderr, "invalid or missing --lang (language must be one of: rust|go|cpp|c|python)\n")
 		return 2
 	}
 	if !model.ValidDifficulty(*diff) {
