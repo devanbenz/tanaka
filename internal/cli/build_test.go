@@ -53,3 +53,31 @@ func TestBuildUnknownID(t *testing.T) {
 		t.Fatalf("expected unknown-id error, code=%d stderr=%q", code, errOut.String())
 	}
 }
+
+func TestBuildResumesExisting(t *testing.T) {
+	d := testDeps(t)
+	d.invoker = &agent.Fake{Responses: map[string]json.RawMessage{
+		"sections":   json.RawMessage(`{"title":"Doc","sections":[{"title":"S1","markdown":"x"}]}`),
+		"build plan": json.RawMessage(`{"skeleton_files":[{"path":"go.mod","content":"module x"}],"steps":[{"goal":"do the thing","files":[{"path":"a_test.go","content":"package x"}]}]}`),
+	}}
+	d.stdin = strings.NewReader("content")
+	var out, errOut bytes.Buffer
+	// First run: add the source.
+	if code := run(context.Background(), []string{"add", "-"}, d, &out, &errOut); code != 0 {
+		t.Fatalf("add exit = %d; %s", code, errOut.String())
+	}
+	out.Reset()
+	// Second run: build id1 --lang go (generates).
+	if code := run(context.Background(), []string{"build", "id1", "--lang", "go"}, d, &out, &errOut); code != 0 {
+		t.Fatalf("first build exit = %d; %s", code, errOut.String())
+	}
+	out.Reset()
+	// Third run: build id1 --lang go again (should resume).
+	code := run(context.Background(), []string{"build", "id1", "--lang", "go"}, d, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("resume build exit = %d; stderr=%s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "resuming") {
+		t.Fatalf("expected 'resuming' in output, got: %q", out.String())
+	}
+}

@@ -67,9 +67,16 @@ func (s *sqliteStore) GetBuild(ctx context.Context, sourceID, language string) (
 }
 
 func (s *sqliteStore) SetBuildStepStatus(ctx context.Context, stepID, status string) error {
-	if _, err := s.db.ExecContext(ctx,
-		`UPDATE build_steps SET status = ? WHERE id = ?`, status, stepID); err != nil {
+	res, err := s.db.ExecContext(ctx, `UPDATE build_steps SET status = ? WHERE id = ?`, status, stepID)
+	if err != nil {
 		return fmt.Errorf("set build step status %s: %w", stepID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("set build step status %s: %w", stepID, err)
+	}
+	if n == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

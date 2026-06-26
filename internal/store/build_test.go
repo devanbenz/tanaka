@@ -86,6 +86,32 @@ func TestSetBuildStepStatusAndGetStep(t *testing.T) {
 	}
 }
 
+func TestSetBuildStepStatusNotFound(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	if err := s.SetBuildStepStatus(ctx, "missing", model.StatusPassed); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDeleteSourceCascadesBuilds(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	buildSource(t, s)
+	if err := s.SaveBuild(ctx, sampleBuild()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteSource(ctx, "src1"); err != nil {
+		t.Fatalf("DeleteSource: %v", err)
+	}
+	if _, err := s.GetBuild(ctx, "src1", model.LangGo); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetBuild after cascade delete: err = %v, want ErrNotFound", err)
+	}
+	if _, err := s.GetBuildStep(ctx, "st0"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetBuildStep after cascade delete: err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestUniqueBuildPerSourceLanguage(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

@@ -19,7 +19,7 @@ func WriteFiles(workspace string, files []model.BuildFile) error {
 		if err := SafeRelPath(f.Path); err != nil {
 			return err
 		}
-		full := filepath.Join(workspace, filepath.Clean(f.Path))
+		full := filepath.Join(workspace, f.Path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			return fmt.Errorf("mkdir for %s: %w", f.Path, err)
 		}
@@ -61,9 +61,6 @@ func StartBuild(ctx context.Context, inv agent.Invoker, st store.Store, src *mod
 			ID: newID(), BuildID: b.ID, Idx: i, Goal: sg.Goal, Files: sg.Files, Status: status,
 		})
 	}
-	if err := st.SaveBuild(ctx, b); err != nil {
-		return nil, err
-	}
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		return nil, fmt.Errorf("create workspace: %w", err)
 	}
@@ -74,6 +71,9 @@ func StartBuild(ctx context.Context, inv agent.Invoker, st store.Store, src *mod
 		if err := WriteFiles(ws, b.Steps[0].Files); err != nil {
 			return nil, err
 		}
+	}
+	if err := st.SaveBuild(ctx, b); err != nil {
+		return nil, err
 	}
 	return b, nil
 }

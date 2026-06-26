@@ -248,6 +248,16 @@ func cmdBuild(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "build: %v\n", err)
 		return 1
 	}
+	if existing, err := d.store.GetBuild(ctx, id, *lang); err == nil {
+		fmt.Fprintf(stdout, "build already exists, resuming: %s\n", existing.Workspace)
+		for _, stp := range existing.Steps {
+			fmt.Fprintf(stdout, "  %d. %s\n", stp.Idx+1, stp.Goal)
+		}
+		return 0
+	} else if !errors.Is(err, store.ErrNotFound) {
+		fmt.Fprintf(stderr, "build: %v\n", err)
+		return 1
+	}
 	dataDir, err := app.DataDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "build: %v\n", err)

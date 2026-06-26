@@ -30,7 +30,7 @@ var commands = map[string][]string{
 
 func commandFor(language string) ([]string, bool) {
 	c, ok := commands[language]
-	return c, ok
+	return append([]string(nil), c...), ok
 }
 
 // ExecRunner runs the per-language test command as a subprocess.
@@ -70,6 +70,9 @@ func (r *ExecRunner) Run(ctx context.Context, workspace, language string) (Resul
 	// Distinguish "could not run" from "ran and failed tests".
 	if errors.Is(cctx.Err(), context.DeadlineExceeded) {
 		return Result{RunError: true, Output: out + "\n(test run timed out)"}, nil
+	}
+	if errors.Is(cctx.Err(), context.Canceled) {
+		return Result{RunError: true, Output: out + "\n(test run canceled)"}, nil
 	}
 	var notFound *exec.Error
 	if errors.As(err, &notFound) {

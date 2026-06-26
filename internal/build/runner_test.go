@@ -2,8 +2,6 @@ package build
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -53,8 +51,6 @@ func TestExecRunnerPassAndFail(t *testing.T) {
 	if err != nil || res.Passed || res.RunError {
 		t.Fatalf("fail: res=%+v err=%v", res, err)
 	}
-	_ = os.Stat // keep os import
-	_ = filepath.Join
 }
 
 func contains(s, sub string) bool { return len(s) >= len(sub) && (s == sub || indexOf(s, sub) >= 0) }
