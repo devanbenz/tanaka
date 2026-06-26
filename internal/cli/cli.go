@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/app"
+	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/ingest"
+	"github.com/devandbenz/tanaka/internal/model"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
 	"github.com/devandbenz/tanaka/internal/ui"
@@ -33,6 +36,7 @@ Commands:
   list               List imported sources
   remove <id>        Remove an imported source (and its sections)
   prepare <id>       Generate the study package for a source (quizzes etc.)
+  build <id> --lang L [--difficulty D]   Scaffold a build workspace for a source
   serve [--port N]   Start the local study web UI (default 127.0.0.1:7777)
   version            Print the version
   help               Show this help
@@ -108,6 +112,8 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdRemove(ctx, args[1:], d, stdout, stderr)
 	case "prepare":
 		return cmdPrepare(ctx, args[1:], d, stdout, stderr)
+	case "build":
+		return cmdBuild(ctx, args[1:], d, stdout, stderr)
 	case "serve":
 		return cmdServe(ctx, args[1:], d, stdout, stderr)
 	default:
@@ -204,6 +210,59 @@ func cmdList(ctx context.Context, d deps, stdout, stderr io.Writer) int {
 	}
 	for _, s := range sources {
 		fmt.Fprintf(stdout, "%s  %s  (%s)\n", s.ID, s.Title, s.Origin)
+	}
+	return 0
+}
+
+func cmdBuild(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	lang := fs.String("lang", "", "language: rust|go|cpp|c|python")
+	diff := fs.String("difficulty", model.DiffSpecTests, "difficulty: guided|spec+tests|blank-page")
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka build <id> --lang <L> [--difficulty <D>]")
+		return 2
+	}
+	id := args[0]
+	if err := fs.Parse(args[1:]); err != nil {
+		return 2
+	}
+	if !model.ValidLanguage(*lang) {
+		fmt.Fprintf(stderr, "invalid or missing --language (use rust|go|cpp|c|python)\n")
+		return 2
+	}
+	if !model.ValidDifficulty(*diff) {
+		fmt.Fprintf(stderr, "invalid --difficulty (use guided|spec+tests|blank-page)\n")
+		return 2
+	}
+	if err := d.invoker.Check(ctx); err != nil {
+		fmt.Fprintf(stderr, "claude CLI unavailable: %v\nis it installed and logged in? try: claude login\n", err)
+		return 1
+	}
+	src, err := d.store.GetSource(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", id)
+			return 1
+		}
+		fmt.Fprintf(stderr, "build: %v\n", err)
+		return 1
+	}
+	dataDir, err := app.DataDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "build: %v\n", err)
+		return 1
+	}
+	buildsDir := filepath.Join(dataDir, "builds")
+	b, err := build.StartBuild(ctx, d.invoker, d.store, src, *lang, *diff, d.newID, buildsDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "build: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "build workspace: %s\n", b.Workspace)
+	fmt.Fprintf(stdout, "open it in your editor. steps:\n")
+	for _, st := range b.Steps {
+		fmt.Fprintf(stdout, "  %d. %s\n", st.Idx+1, st.Goal)
 	}
 	return 0
 }
