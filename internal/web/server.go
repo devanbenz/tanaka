@@ -59,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /build/{id}", s.handleBuildEntry)
 	mux.HandleFunc("POST /build/{id}", s.handleBuildStart)
 	mux.HandleFunc("GET /build/{id}/{lang}", s.handleBuildView)
+	mux.HandleFunc("POST /build/{id}/{lang}/test", s.handleBuildTest)
 	return mux
 }
 
@@ -420,6 +421,51 @@ func mark(status string) string {
 	default:
 		return "[ ]"
 	}
+}
+
+type buildTestResponse struct {
+	Passed   bool   `json:"passed"`
+	Output   string `json:"output"`
+	RunError bool   `json:"runError"`
+	Complete bool   `json:"complete"`
+}
+
+func (s *Server) handleBuildTest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, lang := r.PathValue("id"), r.PathValue("lang")
+	b, err := s.store.GetBuild(ctx, id, lang)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cur := currentBuildStep(b)
+	if cur < 0 {
+		writeJSON(w, buildTestResponse{Complete: true})
+		return
+	}
+	res, err := s.runner.Run(ctx, b.Workspace, lang)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := buildTestResponse{Passed: res.Passed, Output: res.Output, RunError: res.RunError}
+	if res.Passed {
+		if err := build.PassStep(ctx, s.store, b, cur); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Complete = currentBuildStep(b) < 0
+	}
+	writeJSON(w, resp)
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
