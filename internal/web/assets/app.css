@@ -15,3 +15,6 @@ body { background: #008080; padding: 16px; font-family: Arial, sans-serif; }
 .home-nav a { color: #fff; font-weight: bold; }
 .quiz { margin-top: 12px; }
 .verdict { margin-top: 6px; }
+.verdict-pass { color: #008000; font-weight: bold; }
+.verdict-partial { color: #9a6700; font-weight: bold; }
+.verdict-fail { color: #b00000; font-weight: bold; }

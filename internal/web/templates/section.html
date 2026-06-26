@@ -45,11 +45,9 @@
       <div class="field-row" style="justify-content:space-between">
         <form method="POST" action="/study/{{.Source.ID}}/{{.Section.Idx}}/skip"><button type="submit">Skip section</button></form>
         {{if .HasNext}}
-          {{if .NextUnlocked}}
-            <a href="/study/{{.Source.ID}}/{{.NextIdx}}"><button id="next-btn">Next</button></a>
-          {{else}}
-            <button id="next-btn" disabled>Next</button>
-          {{end}}
+          <button id="next-btn" data-next="/study/{{.Source.ID}}/{{.NextIdx}}" {{if not .NextUnlocked}}disabled{{end}}>Next</button>
+        {{else}}
+          <a href="/"><button>Done &mdash; home</button></a>
         {{end}}
       </div>
     </div>

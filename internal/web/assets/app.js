@@ -8,6 +8,7 @@ async function grade(form) {
     answer: form.querySelector('textarea') ? form.querySelector('textarea').value : "",
   };
   const out = form.querySelector('.verdict');
+  out.className = 'verdict';
   out.textContent = 'grading...';
   try {
     const res = await fetch('/grade', {
@@ -18,6 +19,7 @@ async function grade(form) {
     if (!res.ok) { out.textContent = 'grading unavailable - try again'; return; }
     const v = await res.json();
     out.textContent = v.verdict + (v.feedback ? ' - ' + v.feedback : '');
+    out.className = 'verdict verdict-' + v.verdict;
     if (v.sectionPassed) {
       const next = document.getElementById('next-btn');
       if (next) next.disabled = false;
@@ -28,4 +30,11 @@ async function grade(form) {
 }
 document.addEventListener('submit', function (e) {
   if (e.target.classList.contains('quiz-form')) { e.preventDefault(); grade(e.target); }
+});
+// Next is a button (no link) so a disabled state can't be navigated; when it's
+// enabled (section passed), clicking it goes to the next section.
+document.addEventListener('click', function (e) {
+  if (e.target.id === 'next-btn' && !e.target.disabled && e.target.dataset.next) {
+    location.href = e.target.dataset.next;
+  }
 });
