@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -19,17 +20,6 @@ func TestFrameLineContainsParts(t *testing.T) {
 	}
 }
 
-func TestWorkFramesNonEmpty(t *testing.T) {
-	if len(workFrames) == 0 {
-		t.Fatal("workFrames must not be empty")
-	}
-	for i, f := range workFrames {
-		if f == "" {
-			t.Fatalf("workFrames[%d] is empty", i)
-		}
-	}
-}
-
 func TestSpinnerNonTTYWritesPlainPhaseLines(t *testing.T) {
 	var buf bytes.Buffer // not a *os.File, so not a TTY
 	s := NewSpinner(&buf, "reading & structuring paper.pdf")
@@ -44,6 +34,37 @@ func TestSpinnerNonTTYWritesPlainPhaseLines(t *testing.T) {
 	// Non-TTY output must not animate with carriage returns.
 	if strings.Contains(out, "\r") {
 		t.Fatalf("non-TTY output should not contain carriage returns, got %q", out)
+	}
+}
+
+func TestKaomojiSetNonEmpty(t *testing.T) {
+	if len(kaomojiSet) == 0 {
+		t.Fatal("kaomojiSet must not be empty")
+	}
+	for i, k := range kaomojiSet {
+		if len(k) == 0 {
+			t.Fatalf("kaomojiSet[%d] has no frames", i)
+		}
+		for j, f := range k {
+			if f == "" {
+				t.Fatalf("kaomojiSet[%d][%d] is empty", i, j)
+			}
+		}
+	}
+}
+
+func TestNextKaomoji(t *testing.T) {
+	r := rand.New(rand.NewSource(1))
+	// With >1 entries, never returns the current index.
+	for i := 0; i < 100; i++ {
+		got := nextKaomoji(2, 5, r)
+		if got == 2 || got < 0 || got >= 5 {
+			t.Fatalf("nextKaomoji returned %d", got)
+		}
+	}
+	// With a single entry, returns 0.
+	if got := nextKaomoji(0, 1, r); got != 0 {
+		t.Fatalf("nextKaomoji(0,1) = %d, want 0", got)
 	}
 }
 

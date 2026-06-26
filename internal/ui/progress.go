@@ -4,17 +4,32 @@ package ui
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"sync"
 	"time"
 )
 
-// workFrames is a kaomoji that "dances" while work is in progress.
-var workFrames = []string{
-	"┌(・o・)┘",
-	"└(・o・)┐",
-	"┌(・o・)┐",
-	"└(・o・)┘",
+// kaomojiSet is a curated set of animated kaomoji; each is a list of frames.
+var kaomojiSet = [][]string{
+	{"┌(･o･)┘", "└(･o･)┐", "┌(･o･)┐", "└(･o･)┘"},
+	{"(・_・)", "(・_・ )", "( ・_・)", "(・_・)"},
+	{"┐(･ω･)┌", "┌(･ω･)┐"},
+	{"(>_<)", "(>ω<)", "(>﹏<)"},
+	{"(๑•̀ㅂ•́)و", "(๑•̀ㅂ•́)൬"},
+}
+
+// nextKaomoji returns an index in [0,n) different from cur (when n>1).
+func nextKaomoji(cur, n int, r *rand.Rand) int {
+	if n <= 1 {
+		return 0
+	}
+	for {
+		k := r.Intn(n)
+		if k != cur {
+			return k
+		}
+	}
 }
 
 const (
@@ -71,16 +86,25 @@ func (s *Spinner) Start() {
 	s.done = make(chan struct{})
 	go func() {
 		defer close(s.done)
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		cur := r.Intn(len(kaomojiSet))
+		frame := 0
+		lastRotate := time.Now()
 		t := time.NewTicker(tick)
 		defer t.Stop()
-		i := 0
 		for {
 			select {
 			case <-s.stop:
 				return
 			case <-t.C:
-				fmt.Fprint(s.w, frameLine(workFrames[i%len(workFrames)], s.msg, time.Since(s.start)))
-				i++
+				if time.Since(lastRotate) > 3*time.Second {
+					cur = nextKaomoji(cur, len(kaomojiSet), r)
+					frame = 0
+					lastRotate = time.Now()
+				}
+				frames := kaomojiSet[cur]
+				fmt.Fprint(s.w, frameLine(frames[frame%len(frames)], s.msg, time.Since(s.start)))
+				frame++
 			}
 		}
 	}()
