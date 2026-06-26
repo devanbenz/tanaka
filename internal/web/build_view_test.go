@@ -10,7 +10,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/model"
 )
 
-// startBuild drives the start endpoint and returns once the build exists.
+// startBuild drives the start endpoint and waits until the build job completes.
 func startBuild(t *testing.T, srv *Server) {
 	t.Helper()
 	srv.inv = buildFakeAgent()
@@ -23,6 +23,7 @@ func startBuild(t *testing.T, srv *Server) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("start failed: %d %s", rec.Code, rec.Body.String())
 	}
+	waitJob(t, srv.jobs, "build:src1:go")
 }
 
 func TestBuildViewRendersCurrentStep(t *testing.T) {

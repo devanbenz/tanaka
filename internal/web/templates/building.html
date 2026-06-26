@@ -1,0 +1,13 @@
+{{define "content"}}
+<div class="window" style="max-width:520px">
+  <div class="title-bar"><div class="title-bar-text">Building - {{.Lang}}</div></div>
+  <div class="window-body">
+    <p>Generating your build workspace. You can leave this page — it keeps working,
+       and a notification appears when it's ready.</p>
+    <p><span class="kaomoji" data-kaomoji="1">...</span> <span id="progress">{{.Progress}}</span></p>
+  </div>
+</div>
+<script>
+  window.__pollJob = {key: "build:{{.SourceID}}:{{.Lang}}", redirect: "/build/{{.SourceID}}/{{.Lang}}"};
+</script>
+{{end}}

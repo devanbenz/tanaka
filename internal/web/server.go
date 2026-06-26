@@ -369,10 +369,11 @@ func (s *Server) handleBuildStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if _, err := build.StartBuild(ctx, s.inv, s.store, src, lang, diff, s.newID, s.buildsDir); err != nil {
-		http.Error(w, "could not start build: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	s.jobs.Start("build:"+id+":"+lang, "build", id, lang, func(progress func(string)) error {
+		progress("generating build plan")
+		_, err := build.StartBuild(context.Background(), s.inv, s.store, src, lang, diff, s.newID, s.buildsDir)
+		return err
+	})
 	http.Redirect(w, r, "/build/"+id+"/"+lang, http.StatusSeeOther)
 }
 
@@ -400,6 +401,10 @@ func (s *Server) handleBuildView(w http.ResponseWriter, r *http.Request) {
 	b, err := s.store.GetBuild(ctx, id, lang)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
+			if j, ok := s.jobs.Get("build:" + id + ":" + lang); ok && j.Status == "running" {
+				s.render(w, "building.html", map[string]any{"Title": id, "SourceID": id, "Lang": lang, "Progress": j.Progress})
+				return
+			}
 			http.NotFound(w, r)
 			return
 		}

@@ -72,7 +72,8 @@ func TestBuildStartRedirectsToView(t *testing.T) {
 	if loc := rec.Header().Get("Location"); loc != "/build/src1/go" {
 		t.Fatalf("redirect = %q, want /build/src1/go", loc)
 	}
-	// Build persisted.
+	// Build is created by the background job; wait for it to finish.
+	waitJob(t, srv.jobs, "build:src1:go")
 	if _, err := st.GetBuild(context.Background(), "src1", "go"); err != nil {
 		t.Fatalf("build not persisted: %v", err)
 	}
