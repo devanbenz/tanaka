@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -293,7 +294,8 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1
 	}
-	srv, err := web.NewServer(d.store, d.invoker, d.newID, build.NewExecRunner(), filepath.Join(dataDir, "builds"))
+	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	srv, err := web.NewServer(d.store, d.invoker, d.newID, build.NewExecRunner(), filepath.Join(dataDir, "builds"), logger)
 	if err != nil {
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,16 +35,19 @@ type Server struct {
 	newID     func() string
 	runner    build.Runner
 	buildsDir string
+	log       *slog.Logger
+	jobs      *JobManager
 	tmpl      *template.Template
 }
 
 // NewServer parses the embedded templates and returns a Server.
-func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner build.Runner, buildsDir string) (*Server, error) {
+func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner build.Runner, buildsDir string, log *slog.Logger) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
-	return &Server{store: st, inv: inv, newID: newID, runner: runner, buildsDir: buildsDir, tmpl: tmpl}, nil
+	return &Server{store: st, inv: inv, newID: newID, runner: runner, buildsDir: buildsDir,
+		log: log, jobs: NewJobManager(log), tmpl: tmpl}, nil
 }
 
 // Handler returns the HTTP router.
@@ -66,7 +70,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /build/{id}/{lang}/test", s.handleBuildTest)
 	mux.HandleFunc("POST /build/{id}/{lang}/skip", s.handleBuildSkip)
 	mux.HandleFunc("POST /build/{id}/{lang}/hint", s.handleBuildHint)
-	return mux
+	mux.HandleFunc("GET /jobs", s.handleJobs)
+	return logRequests(s.log, mux)
+}
+
+func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.jobs.Snapshot())
 }
 
 // render executes the base template with the named content block and data.

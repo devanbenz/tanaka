@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,7 +25,8 @@ func testServer(t *testing.T) (*Server, store.Store) {
 	t.Cleanup(func() { st.Close() })
 	n := 0
 	srv, err := NewServer(st, &agent.Fake{}, func() string { n++; return "id" + string(rune('0'+n)) },
-		&build.FakeRunner{Result: build.Result{Passed: true}}, t.TempDir())
+		&build.FakeRunner{Result: build.Result{Passed: true}},
+		t.TempDir(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
