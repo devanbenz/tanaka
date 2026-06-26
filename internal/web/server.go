@@ -58,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /study/{id}/{idx}/skip", s.handleSkip)
 	mux.HandleFunc("GET /build/{id}", s.handleBuildEntry)
 	mux.HandleFunc("POST /build/{id}", s.handleBuildStart)
+	mux.HandleFunc("GET /build/{id}/{lang}", s.handleBuildView)
 	return mux
 }
 
@@ -352,6 +353,54 @@ func (s *Server) handleBuildStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/build/"+id+"/"+lang, http.StatusSeeOther)
+}
+
+// currentBuildStep returns the index of the first unlocked step, or -1 if the
+// build has no active step (all passed/skipped = complete).
+func currentBuildStep(b *model.Build) int {
+	for i, st := range b.Steps {
+		if st.Status == model.StatusUnlocked {
+			return i
+		}
+	}
+	return -1
+}
+
+type buildNavItem struct {
+	Idx     int
+	Goal    string
+	Mark    string
+	Current bool
+}
+
+func (s *Server) handleBuildView(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	lang := r.PathValue("lang")
+	b, err := s.store.GetBuild(ctx, id, lang)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cur := currentBuildStep(b)
+	var nav []buildNavItem
+	for i, st := range b.Steps {
+		nav = append(nav, buildNavItem{Idx: i, Goal: st.Goal, Mark: mark(st.Status), Current: i == cur})
+	}
+	data := map[string]any{
+		"Title": id, "SourceID": id, "Lang": lang, "Workspace": b.Workspace,
+		"Nav": nav, "Complete": cur == -1,
+	}
+	if cur >= 0 {
+		data["Step"] = b.Steps[cur]
+		data["StepNum"] = cur + 1
+		data["Total"] = len(b.Steps)
+	}
+	s.render(w, "build_view.html", data)
 }
 
 type navItem struct {

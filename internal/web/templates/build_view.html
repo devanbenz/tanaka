@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="layout">
+  <div class="sidebar window">
+    <div class="title-bar"><div class="title-bar-text">Build steps</div></div>
+    <div class="window-body">
+      <ul class="section-list">
+        {{range .Nav}}<li class="{{if .Current}}current{{end}}">{{.Mark}} {{.Goal}}</li>{{end}}
+      </ul>
+    </div>
+  </div>
+  <div class="content window">
+    <div class="title-bar"><div class="title-bar-text">Build - {{.Lang}}</div></div>
+    <div class="window-body">
+      <p class="status-bar"><span class="status-bar-field">workspace: {{.Workspace}}</span></p>
+      <p>Open that folder in your editor and implement the step, then run the tests.</p>
+      {{if .Complete}}
+        <p>\(^_^)/ build complete</p>
+      {{else}}
+        <fieldset><legend>Step {{.StepNum}} of {{.Total}}</legend>
+          <p>{{.Step.Goal}}</p>
+        </fieldset>
+        <div class="field-row">
+          <button id="run-btn" onclick="runTests('{{.SourceID}}','{{.Lang}}')">Run tests</button>
+          <button id="hint-btn" onclick="getHint('{{.SourceID}}','{{.Lang}}')">Hint</button>
+          <form method="POST" action="/build/{{.SourceID}}/{{.Lang}}/skip" style="display:inline"><button type="submit">Skip step</button></form>
+        </div>
+        <pre id="output" class="markdown" style="min-height:3em"></pre>
+        <div id="hint" class="verdict"></div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
