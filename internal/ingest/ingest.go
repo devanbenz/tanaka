@@ -38,7 +38,10 @@ const structureSchema = `{
 }`
 
 const studyInstruction = "Clean it into Markdown and split it into ordered sections " +
-	"at natural informational boundaries. Return a title and the sections."
+	"at natural informational boundaries. Return a title and the sections. " +
+	"For the opening/front matter, include only the title and the author(s) — omit the " +
+	"abstract, keywords, affiliations, venue, dates, and other citation metadata. Start " +
+	"the real sections at the first substantive section of the content."
 
 func filePrompt(path string) string {
 	return "Read the file at " + path + " using your Read tool. " + studyInstruction
