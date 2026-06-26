@@ -37,8 +37,8 @@ func TestStudyEntryShowsPreparingWhileRunning(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "Preparing") {
-		t.Fatalf("expected preparing page, got %q", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "window.__pollJob") {
+		t.Fatalf("expected preparing page (window.__pollJob), got %q", rec.Body.String())
 	}
 	close(release)
 	waitJob(t, srv.jobs, "prepare:src1")

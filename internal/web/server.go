@@ -170,7 +170,11 @@ func (s *Server) handlePrepare(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	src, err := s.store.GetSource(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	s.jobs.Start("prepare:"+id, "prepare", id, "", func(progress func(string)) error {
