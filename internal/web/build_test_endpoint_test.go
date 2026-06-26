@@ -34,6 +34,9 @@ func TestRunTestsPassAdvances(t *testing.T) {
 	if !resp.Passed {
 		t.Fatalf("resp = %+v, want passed", resp)
 	}
+	if resp.Complete {
+		t.Fatalf("after passing step 0 of 2, complete should be false")
+	}
 	// Step 0 now passed, step 1 unlocked.
 	b, _ := st.GetBuild(context.Background(), "src1", "go")
 	if b.Steps[0].Status != model.StatusPassed || b.Steps[1].Status != model.StatusUnlocked {
@@ -72,5 +75,30 @@ func TestRunTestsRunError(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &resp)
 	if !resp.RunError || resp.Passed {
 		t.Fatalf("resp = %+v, want runError", resp)
+	}
+}
+
+func TestRunTestsCompleteOnLastStep(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.runner = &build.FakeRunner{Result: build.Result{Passed: true, Output: "ok"}}
+	startBuild(t, srv) // 2-step build, step 0 active
+	// Pass step 0.
+	if rec := postTest(t, srv); rec.Code != http.StatusOK {
+		t.Fatalf("first test status = %d", rec.Code)
+	}
+	// Pass step 1 (now active) -> complete.
+	rec := postTest(t, srv)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("second test status = %d", rec.Code)
+	}
+	var resp struct {
+		Passed   bool `json:"passed"`
+		Complete bool `json:"complete"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Passed || !resp.Complete {
+		t.Fatalf("resp = %+v, want passed + complete after last step", resp)
 	}
 }
