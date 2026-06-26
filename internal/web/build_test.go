@@ -41,8 +41,10 @@ func TestBuildPickerShown(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "rust") || !strings.Contains(body, "spec+tests") || !strings.Contains(body, "Start") {
-		t.Fatalf("picker missing options: %q", body)
+	for _, want := range []string{"rust", "guided", "blank-page", "Start"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("picker missing %q: %q", want, body)
+		}
 	}
 }
 

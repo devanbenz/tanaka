@@ -316,8 +316,8 @@ func (s *Server) handleBuildEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "build_picker.html", map[string]any{
 		"Title": src.Title, "Source": src,
-		"Languages":    []template.HTML{"rust", "go", "cpp", "c", "python"},
-		"Difficulties": []template.HTML{"guided", "spec+tests", "blank-page"},
+		"Languages":    []string{"rust", "go", "cpp", "c", "python"},
+		"Difficulties": []string{"guided", "spec+tests", "blank-page"},
 	})
 }
 
