@@ -288,7 +288,12 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "invalid port %d (must be 1-65535)\n", *port)
 		return 2
 	}
-	srv, err := web.NewServer(d.store, d.invoker, d.newID)
+	dataDir, err := app.DataDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "serve: %v\n", err)
+		return 1
+	}
+	srv, err := web.NewServer(d.store, d.invoker, d.newID, build.NewExecRunner(), filepath.Join(dataDir, "builds"))
 	if err != nil {
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/devandbenz/tanaka/internal/agent"
+	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/model"
 	"github.com/devandbenz/tanaka/internal/store"
 )
@@ -21,7 +22,8 @@ func testServer(t *testing.T) (*Server, store.Store) {
 	}
 	t.Cleanup(func() { st.Close() })
 	n := 0
-	srv, err := NewServer(st, &agent.Fake{}, func() string { n++; return "id" + string(rune('0'+n)) })
+	srv, err := NewServer(st, &agent.Fake{}, func() string { n++; return "id" + string(rune('0'+n)) },
+		&build.FakeRunner{Result: build.Result{Passed: true}}, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}

@@ -7,7 +7,7 @@
     {{else}}
     <ul class="tree-view">
       {{range .Sources}}
-      <li><a href="/study/{{.ID}}">{{.Title}}</a> &mdash; {{.Done}}/{{.Total}}</li>
+      <li><a href="/study/{{.ID}}">{{.Title}}</a> &mdash; {{.Done}}/{{.Total}} &middot; <a href="/build/{{.ID}}">build</a></li>
       {{end}}
     </ul>
     {{end}}

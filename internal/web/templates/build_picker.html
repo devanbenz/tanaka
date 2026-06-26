@@ -1,0 +1,18 @@
+{{define "content"}}
+<div class="window" style="max-width:520px">
+  <div class="title-bar"><div class="title-bar-text">Build - {{.Source.Title}}</div></div>
+  <div class="window-body">
+    <p>Implement this material yourself. Pick a language and difficulty; Tanaka
+       scaffolds a workspace with acceptance tests for you to make pass.</p>
+    <form method="POST" action="/build/{{.Source.ID}}">
+      <fieldset><legend>Language</legend>
+        {{range .Languages}}<div class="field-row"><input type="radio" id="lang-{{.}}" name="language" value="{{.}}"><label for="lang-{{.}}">{{.}}</label></div>{{end}}
+      </fieldset>
+      <fieldset><legend>Difficulty</legend>
+        {{range .Difficulties}}<div class="field-row"><input type="radio" id="diff-{{.}}" name="difficulty" value="{{.}}"><label for="diff-{{.}}">{{.}}</label></div>{{end}}
+      </fieldset>
+      <div class="field-row"><button type="submit">Start</button></div>
+    </form>
+  </div>
+</div>
+{{end}}

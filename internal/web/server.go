@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/devandbenz/tanaka/internal/agent"
+	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/model"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
@@ -24,19 +25,21 @@ var assetsFS embed.FS
 
 // Server holds dependencies for the study UI.
 type Server struct {
-	store store.Store
-	inv   agent.Invoker
-	newID func() string
-	tmpl  *template.Template
+	store     store.Store
+	inv       agent.Invoker
+	newID     func() string
+	runner    build.Runner
+	buildsDir string
+	tmpl      *template.Template
 }
 
 // NewServer parses the embedded templates and returns a Server.
-func NewServer(st store.Store, inv agent.Invoker, newID func() string) (*Server, error) {
+func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner build.Runner, buildsDir string) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
-	return &Server{store: st, inv: inv, newID: newID, tmpl: tmpl}, nil
+	return &Server{store: st, inv: inv, newID: newID, runner: runner, buildsDir: buildsDir, tmpl: tmpl}, nil
 }
 
 // Handler returns the HTTP router.
@@ -53,6 +56,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
 	mux.HandleFunc("POST /grade", s.handleGrade)
 	mux.HandleFunc("POST /study/{id}/{idx}/skip", s.handleSkip)
+	mux.HandleFunc("GET /build/{id}", s.handleBuildEntry)
+	mux.HandleFunc("POST /build/{id}", s.handleBuildStart)
 	return mux
 }
 
@@ -295,6 +300,58 @@ func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/study/"+id+"/"+itoa(idx), http.StatusSeeOther)
+}
+
+func (s *Server) handleBuildEntry(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "build_picker.html", map[string]any{
+		"Title": src.Title, "Source": src,
+		"Languages":    []template.HTML{"rust", "go", "cpp", "c", "python"},
+		"Difficulties": []template.HTML{"guided", "spec+tests", "blank-page"},
+	})
+}
+
+func (s *Server) handleBuildStart(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	src, err := s.store.GetSource(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	lang := r.FormValue("language")
+	diff := r.FormValue("difficulty")
+	if !model.ValidLanguage(lang) || !model.ValidDifficulty(diff) {
+		http.Error(w, "invalid language or difficulty", http.StatusBadRequest)
+		return
+	}
+	// Resume if a build already exists for this language.
+	if _, err := s.store.GetBuild(ctx, id, lang); err == nil {
+		http.Redirect(w, r, "/build/"+id+"/"+lang, http.StatusSeeOther)
+		return
+	} else if !errors.Is(err, store.ErrNotFound) {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err := build.StartBuild(ctx, s.inv, s.store, src, lang, diff, s.newID, s.buildsDir); err != nil {
+		http.Error(w, "could not start build: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/build/"+id+"/"+lang, http.StatusSeeOther)
 }
 
 type navItem struct {
