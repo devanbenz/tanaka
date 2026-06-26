@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/devandbenz/tanaka/internal/model"
 )
 
 // startBuild drives the start endpoint and returns once the build exists.
@@ -53,7 +55,14 @@ func TestBuildViewUnknown404(t *testing.T) {
 }
 
 func TestCurrentBuildStep(t *testing.T) {
-	// pure-function check via a constructed build is covered indirectly;
-	// here assert the helper through the package.
-	// (kept in build_view_test.go for locality)
+	b := &model.Build{Steps: []model.BuildStep{
+		{Status: model.StatusPassed}, {Status: model.StatusUnlocked}, {Status: model.StatusLocked},
+	}}
+	if got := currentBuildStep(b); got != 1 {
+		t.Fatalf("currentBuildStep = %d, want 1", got)
+	}
+	done := &model.Build{Steps: []model.BuildStep{{Status: model.StatusPassed}, {Status: model.StatusSkipped}}}
+	if got := currentBuildStep(done); got != -1 {
+		t.Fatalf("currentBuildStep(all done) = %d, want -1", got)
+	}
 }

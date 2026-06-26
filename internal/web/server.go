@@ -374,7 +374,6 @@ func currentBuildStep(b *model.Build) int {
 }
 
 type buildNavItem struct {
-	Idx     int
 	Goal    string
 	Mark    string
 	Current bool
@@ -393,13 +392,17 @@ func (s *Server) handleBuildView(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	title := id
+	if src, serr := s.store.GetSource(ctx, id); serr == nil {
+		title = src.Title
+	}
 	cur := currentBuildStep(b)
 	var nav []buildNavItem
 	for i, st := range b.Steps {
-		nav = append(nav, buildNavItem{Idx: i, Goal: st.Goal, Mark: mark(st.Status), Current: i == cur})
+		nav = append(nav, buildNavItem{Goal: st.Goal, Mark: mark(st.Status), Current: i == cur})
 	}
 	data := map[string]any{
-		"Title": id, "SourceID": id, "Lang": lang, "Workspace": b.Workspace,
+		"Title": title, "SourceID": id, "Lang": lang, "Workspace": b.Workspace,
 		"Nav": nav, "Complete": cur == -1,
 	}
 	if cur >= 0 {
@@ -533,7 +536,14 @@ func readWorkspaceText(ws string) string {
 	var sb strings.Builder
 	total := 0
 	filepath.WalkDir(ws, func(p string, de fs.DirEntry, err error) error {
-		if err != nil || de.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if de.IsDir() {
+			switch filepath.Base(p) {
+			case "target", "build", "node_modules", ".git":
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		b, e := os.ReadFile(p)
@@ -543,7 +553,7 @@ func readWorkspaceText(ws string) string {
 		rel, _ := filepath.Rel(ws, p)
 		chunk := "=== " + rel + " ===\n" + string(b) + "\n"
 		if total+len(chunk) > capBytes {
-			return filepath.SkipAll
+			return nil
 		}
 		sb.WriteString(chunk)
 		total += len(chunk)
