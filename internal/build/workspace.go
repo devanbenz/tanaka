@@ -95,6 +95,7 @@ func advance(ctx context.Context, st store.Store, b *model.Build, idx int, statu
 	if err := st.SetBuildStepStatus(ctx, b.Steps[idx].ID, status); err != nil {
 		return err
 	}
+	b.Steps[idx].Status = status
 	next := idx + 1
 	if next < len(b.Steps) {
 		if err := WriteFiles(b.Workspace, b.Steps[next].Files); err != nil {
@@ -104,6 +105,7 @@ func advance(ctx context.Context, st store.Store, b *model.Build, idx int, statu
 			if err := st.SetBuildStepStatus(ctx, b.Steps[next].ID, model.StatusUnlocked); err != nil {
 				return err
 			}
+			b.Steps[next].Status = model.StatusUnlocked
 		}
 	}
 	return nil

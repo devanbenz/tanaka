@@ -109,7 +109,45 @@ func TestPassStepWritesNextAndUnlocks(t *testing.T) {
 	if got.Steps[0].Status != model.StatusPassed || got.Steps[1].Status != model.StatusUnlocked {
 		t.Fatalf("statuses after pass: %+v", got.Steps)
 	}
+	// In-memory struct must reflect the change (Fix 1).
+	if b.Steps[0].Status != model.StatusPassed || b.Steps[1].Status != model.StatusUnlocked {
+		t.Fatalf("in-memory stale: %+v", b.Steps)
+	}
 	if _, err := os.Stat(filepath.Join(b.Workspace, "compute_test.go")); err != nil {
 		t.Fatalf("step 1 files not written on pass: %v", err)
+	}
+}
+
+func TestPassStepOutOfRange(t *testing.T) {
+	st := newStore(t)
+	ctx := context.Background()
+	src := srcWith2Sections(t, st)
+	b, err := StartBuild(ctx, buildFake(), st, src, "go", "spec+tests", seqIDer(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := PassStep(ctx, st, b, 99); err == nil {
+		t.Fatal("expected error for out-of-range index")
+	}
+}
+
+func TestSkipStepMarksSkippedAndAdvances(t *testing.T) {
+	st := newStore(t)
+	ctx := context.Background()
+	src := srcWith2Sections(t, st)
+	b, err := StartBuild(ctx, buildFake(), st, src, "go", "spec+tests", seqIDer(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SkipStep(ctx, st, b, 0); err != nil {
+		t.Fatal(err)
+	}
+	// In-memory struct must reflect the change (Fix 1).
+	if b.Steps[0].Status != model.StatusSkipped || b.Steps[1].Status != model.StatusUnlocked {
+		t.Fatalf("in-memory statuses stale: %+v", b.Steps)
+	}
+	got, _ := st.GetBuild(ctx, "src1", "go")
+	if got.Steps[0].Status != model.StatusSkipped || got.Steps[1].Status != model.StatusUnlocked {
+		t.Fatalf("persisted statuses wrong: %+v", got.Steps)
 	}
 }
