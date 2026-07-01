@@ -42,7 +42,7 @@ Commands:
   export <id> [--format sheet|obsidian] [-o path]   Export a source: shareable .tanaka sheet, or Obsidian notes folder
   import <file>      Import a .tanaka file as a new source
   build <id> --lang L [--difficulty D]   Scaffold a build workspace for a source
-  serve [--port N]   Start the local study web UI (default 127.0.0.1:7777)
+  serve [--port N] [--obsidian-dir D]   Start the local study web UI (default 127.0.0.1:7777)
   version            Print the version
   help               Show this help
 
@@ -385,6 +385,7 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	port := fs.Int("port", 7777, "port to listen on")
+	obsDir := fs.String("obsidian-dir", "", "live-export Obsidian notes to this directory on section completion")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -398,7 +399,7 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		return 1
 	}
 	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	srv, err := web.NewServer(d.store, d.invoker, d.newID, build.NewExecRunner(), filepath.Join(dataDir, "builds"), logger)
+	srv, err := web.NewServer(d.store, d.invoker, d.newID, build.NewExecRunner(), filepath.Join(dataDir, "builds"), *obsDir, logger)
 	if err != nil {
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1

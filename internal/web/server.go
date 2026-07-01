@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/model"
+	"github.com/devandbenz/tanaka/internal/obsidian"
 	"github.com/devandbenz/tanaka/internal/sheet"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
@@ -32,24 +34,28 @@ var assetsFS embed.FS
 
 // Server holds dependencies for the study UI.
 type Server struct {
-	store     store.Store
-	inv       agent.Invoker
-	newID     func() string
-	runner    build.Runner
-	buildsDir string
-	log       *slog.Logger
-	jobs      *JobManager
-	tmpl      *template.Template
+	store       store.Store
+	inv         agent.Invoker
+	newID       func() string
+	runner      build.Runner
+	buildsDir   string
+	obsidianDir string
+	obsMu       sync.Mutex
+	obsWG       sync.WaitGroup
+	log         *slog.Logger
+	jobs        *JobManager
+	tmpl        *template.Template
 }
 
-// NewServer parses the embedded templates and returns a Server.
-func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner build.Runner, buildsDir string, log *slog.Logger) (*Server, error) {
+// NewServer parses the embedded templates and returns a Server. obsidianDir,
+// when non-empty, enables live Obsidian export on section completion.
+func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner build.Runner, buildsDir, obsidianDir string, log *slog.Logger) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
 	return &Server{store: st, inv: inv, newID: newID, runner: runner, buildsDir: buildsDir,
-		log: log, jobs: NewJobManager(log), tmpl: tmpl}, nil
+		obsidianDir: obsidianDir, log: log, jobs: NewJobManager(log), tmpl: tmpl}, nil
 }
 
 // Handler returns the HTTP router.
@@ -261,6 +267,31 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// syncObsidian regenerates the source's Obsidian folder in the background.
+// No-op when serve was started without --obsidian-dir. Fire-and-forget: it
+// never blocks or fails the HTTP response; errors are logged. obsMu
+// serializes writes; obsWG lets tests wait for completion.
+func (s *Server) syncObsidian(sourceID string) {
+	if s.obsidianDir == "" {
+		return
+	}
+	s.obsWG.Add(1)
+	go func() {
+		defer s.obsWG.Done()
+		s.obsMu.Lock()
+		defer s.obsMu.Unlock()
+		exp, err := obsidian.Assemble(context.Background(), s.store, sourceID)
+		if err != nil {
+			s.log.Error("obsidian sync: assemble", "source", sourceID, "err", err)
+			return
+		}
+		dir := filepath.Join(s.obsidianDir, sheet.Slug(exp.Source.Title))
+		if err := obsidian.Write(dir, exp); err != nil {
+			s.log.Error("obsidian sync: write", "source", sourceID, "err", err)
+		}
+	}()
+}
+
 // passAndUnlockNext marks the section passed and unlocks the following section
 // (by source order) if it is currently locked.
 func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error {
@@ -271,6 +302,7 @@ func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error 
 	if err := s.store.SetSectionStatus(ctx, sectionID, model.StatusPassed); err != nil {
 		return err
 	}
+	s.syncObsidian(sec.SourceID)
 	src, err := s.store.GetSource(ctx, sec.SourceID)
 	if err != nil {
 		return err
@@ -314,6 +346,7 @@ func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	s.syncObsidian(id)
 	next := idx + 1
 	if next < len(src.Sections) {
 		statuses, err := s.store.GetSectionStatuses(ctx, id)
