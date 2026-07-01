@@ -267,10 +267,16 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// DrainObsidian blocks until all in-flight background Obsidian syncs finish.
+// Called during shutdown so a sync isn't killed mid-write.
+func (s *Server) DrainObsidian() { s.obsWG.Wait() }
+
 // syncObsidian regenerates the source's Obsidian folder in the background.
 // No-op when serve was started without --obsidian-dir. Fire-and-forget: it
 // never blocks or fails the HTTP response; errors are logged. obsMu
 // serializes writes; obsWG lets tests wait for completion.
+// Last-writer-wins: each goroutine re-reads fresh store state under obsMu, so
+// the last write always reflects the most complete snapshot.
 func (s *Server) syncObsidian(sourceID string) {
 	if s.obsidianDir == "" {
 		return

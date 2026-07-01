@@ -393,6 +393,12 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "invalid port %d (must be 1-65535)\n", *port)
 		return 2
 	}
+	if *obsDir != "" {
+		if err := os.MkdirAll(*obsDir, 0o755); err != nil {
+			fmt.Fprintf(stderr, "serve: cannot use --obsidian-dir: %v\n", err)
+			return 1
+		}
+	}
 	dataDir, err := app.DataDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "serve: %v\n", err)
@@ -404,6 +410,7 @@ func cmdServe(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "serve: %v\n", err)
 		return 1
 	}
+	defer srv.DrainObsidian()
 	addr := fmt.Sprintf("127.0.0.1:%d", *port)
 	fmt.Fprintf(stdout, "Tanaka study UI on http://%s  (Ctrl-C to stop)\n", addr)
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
