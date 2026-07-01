@@ -19,6 +19,7 @@ func prep(t *testing.T, srv *Server) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("prepare failed: %d %s", rec.Code, rec.Body.String())
 	}
+	waitJob(t, srv.jobs, "prepare:src1")
 }
 
 func TestSectionPageRendersReadingAndQuiz(t *testing.T) {
