@@ -94,6 +94,7 @@ func TestBuildStartResumesExisting(t *testing.T) {
 	if post().Code != http.StatusSeeOther {
 		t.Fatal("first start should redirect")
 	}
+	waitJob(t, srv.jobs, "build:src1:go")
 	// Second start with same language must not error (resume), still 303.
 	if rec := post(); rec.Code != http.StatusSeeOther {
 		t.Fatalf("resume start status = %d, want 303; body=%s", rec.Code, rec.Body.String())

@@ -103,3 +103,49 @@ func TestCmdImportBadFile(t *testing.T) {
 		t.Fatal("expected non-zero exit for corrupt file")
 	}
 }
+
+func TestCmdExportObsidian(t *testing.T) {
+	ctx := context.Background()
+	d := testDeps(t)
+	seedSource(t, d)
+
+	out := filepath.Join(t.TempDir(), "vault")
+	var stdout, stderr bytes.Buffer
+	if code := run(ctx, []string{"export", "src1", "--format", "obsidian", "-o", out}, d, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(out, "My Paper.md")); err != nil {
+		t.Fatalf("hub note missing: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "sections", "01 Intro.md"))
+	if err != nil {
+		t.Fatalf("section note missing: %v", err)
+	}
+	if !strings.Contains(string(b), "[[My Paper]]") {
+		t.Fatalf("section note missing hub link:\n%s", b)
+	}
+}
+
+func TestCmdExportInvalidFormat(t *testing.T) {
+	d := testDeps(t)
+	seedSource(t, d)
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"export", "src1", "--format", "yaml"}, d, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
+func TestCmdExportDefaultFormatIsSheet(t *testing.T) {
+	ctx := context.Background()
+	d := testDeps(t)
+	seedSource(t, d)
+	out := filepath.Join(t.TempDir(), "s.tanaka")
+	var stdout, stderr bytes.Buffer
+	if code := run(ctx, []string{"export", "src1", "-o", out}, d, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("sheet file missing: %v", err)
+	}
+}

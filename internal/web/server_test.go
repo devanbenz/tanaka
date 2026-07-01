@@ -26,7 +26,7 @@ func testServer(t *testing.T) (*Server, store.Store) {
 	n := 0
 	srv, err := NewServer(st, &agent.Fake{}, func() string { n++; return "id" + string(rune('0'+n)) },
 		&build.FakeRunner{Result: build.Result{Passed: true}},
-		t.TempDir(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+		t.TempDir(), "", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}

@@ -61,9 +61,9 @@ func Decode(r io.Reader) (*model.Sheet, error) {
 	return &s, nil
 }
 
-// Filename returns a safe download filename for a sheet with the given source
-// title: a lowercase hyphen-slug plus ".tanaka" (falls back to "sheet.tanaka").
-func Filename(title string) string {
+// Slug returns a lowercase hyphen-slug of title (letters and digits only,
+// runs of anything else become single hyphens), falling back to "sheet".
+func Slug(title string) string {
 	var b strings.Builder
 	prevHyphen := false
 	for _, r := range strings.ToLower(title) {
@@ -82,5 +82,11 @@ func Filename(title string) string {
 	if slug == "" {
 		slug = "sheet"
 	}
-	return slug + ".tanaka"
+	return slug
+}
+
+// Filename returns a safe download filename for a sheet with the given source
+// title: Slug(title) plus ".tanaka".
+func Filename(title string) string {
+	return Slug(title) + ".tanaka"
 }

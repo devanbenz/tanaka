@@ -38,6 +38,18 @@ someone shared with you (imported files always create a fresh source):
     tanaka export <id> -o sheet.tanaka
     tanaka import sheet.tanaka
 
+Export a source as an Obsidian mind map — a folder of wikilinked notes
+(sections, questions with hidden answers, key concepts) that Obsidian's
+graph view renders as a connected web:
+
+    tanaka export <id> --format obsidian            # writes ./<slug>/
+    tanaka export <id> --format obsidian -o ~/vault/tanaka
+
+Or sync live while you study: with --obsidian-dir set, every section you
+pass or skip regenerates that source's notes (including your answers):
+
+    tanaka serve --obsidian-dir ~/vault/tanaka
+
 Start the local web UI and open http://127.0.0.1:7777:
 
     tanaka serve
