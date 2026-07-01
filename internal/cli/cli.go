@@ -19,6 +19,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/ingest"
 	"github.com/devandbenz/tanaka/internal/model"
+	"github.com/devandbenz/tanaka/internal/sheet"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
 	"github.com/devandbenz/tanaka/internal/ui"
@@ -37,6 +38,8 @@ Commands:
   list               List imported sources
   remove <id>        Remove an imported source (and its sections)
   prepare <id>       Generate the study package for a source (quizzes etc.)
+  export <id> [-o file]   Package a source (+quizzes) into a shareable .tanaka file
+  import <file>      Import a .tanaka file as a new source
   build <id> --lang L [--difficulty D]   Scaffold a build workspace for a source
   serve [--port N]   Start the local study web UI (default 127.0.0.1:7777)
   version            Print the version
@@ -113,6 +116,10 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdRemove(ctx, args[1:], d, stdout, stderr)
 	case "prepare":
 		return cmdPrepare(ctx, args[1:], d, stdout, stderr)
+	case "export":
+		return cmdExport(ctx, args[1:], d, stdout, stderr)
+	case "import":
+		return cmdImport(ctx, args[1:], d, stdout, stderr)
 	case "build":
 		return cmdBuild(ctx, args[1:], d, stdout, stderr)
 	case "serve":
@@ -212,6 +219,74 @@ func cmdList(ctx context.Context, d deps, stdout, stderr io.Writer) int {
 	for _, s := range sources {
 		fmt.Fprintf(stdout, "%s  %s  (%s)\n", s.ID, s.Title, s.Origin)
 	}
+	return 0
+}
+
+func cmdExport(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("export", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	outPath := fs.String("o", "", "output file (default: <slug>.tanaka)")
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka export <id> [-o file]")
+		return 2
+	}
+	id := args[0]
+	if err := fs.Parse(args[1:]); err != nil {
+		return 2
+	}
+	sh, err := d.store.ExportSource(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", id)
+			return 1
+		}
+		fmt.Fprintf(stderr, "export: %v\n", err)
+		return 1
+	}
+	path := *outPath
+	if path == "" {
+		path = sheet.Filename(sh.Source.Title)
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "export: %v\n", err)
+		return 1
+	}
+	if err := sheet.Encode(f, sh); err != nil {
+		f.Close()
+		fmt.Fprintf(stderr, "export: %v\n", err)
+		return 1
+	}
+	if err := f.Close(); err != nil {
+		fmt.Fprintf(stderr, "export: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "exported %q to %s\n", sh.Source.Title, path)
+	return 0
+}
+
+func cmdImport(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tanaka import <file.tanaka>")
+		return 2
+	}
+	f, err := os.Open(args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "import: %v\n", err)
+		return 1
+	}
+	defer f.Close()
+	sh, err := sheet.Decode(f)
+	if err != nil {
+		fmt.Fprintf(stderr, "import: %v\n", err)
+		return 1
+	}
+	id, err := d.store.ImportSheet(ctx, sh, d.newID)
+	if err != nil {
+		fmt.Fprintf(stderr, "import: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "imported %q as %s\n", sh.Source.Title, id)
 	return 0
 }
 
