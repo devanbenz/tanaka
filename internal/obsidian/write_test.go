@@ -107,6 +107,15 @@ func TestWriteTreeAndLinks(t *testing.T) {
 		}
 	}
 
+	// Section 02: concept links use canonical casing from first-seen dedup.
+	sec1 := read(t, filepath.Join(dir, "sections", "02 Deep Dive.md"))
+	if !strings.Contains(sec1, "[[Self-Attention]]") {
+		t.Errorf("section 02 missing canonical [[Self-Attention]]:\n%s", sec1)
+	}
+	if strings.Contains(sec1, "[[self-attention]]") {
+		t.Errorf("section 02 has non-canonical [[self-attention]]:\n%s", sec1)
+	}
+
 	// Concept dedup: sec1's "self-attention" merged into first-seen casing.
 	if _, err := os.Stat(filepath.Join(dir, "concepts", "self-attention.md")); err == nil {
 		t.Error("lowercase duplicate concept file exists")

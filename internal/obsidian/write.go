@@ -36,13 +36,18 @@ func Write(dir string, exp *Export) error {
 	}
 	hub := SourceName(exp.Source.Title)
 	concepts := collectConcepts(exp)
+	// Build canonical-casing lookup: lower(name) -> canonical name.
+	canon := make(map[string]string, len(concepts))
+	for _, c := range concepts {
+		canon[strings.ToLower(c.Name)] = c.Name
+	}
 	if err := writeNote(dir, hub, renderHub(exp)); err != nil {
 		return err
 	}
 	for _, sec := range exp.Source.Sections {
 		study := exp.Studies[sec.ID]
 		name := SectionName(sec.Idx, sec.Title)
-		if err := writeNote(filepath.Join(dir, "sections"), name, renderSection(hub, sec, study)); err != nil {
+		if err := writeNote(filepath.Join(dir, "sections"), name, renderSection(hub, sec, study, canon)); err != nil {
 			return err
 		}
 		if study == nil {
@@ -81,6 +86,9 @@ func writeNote(dir, name, body string) error {
 func collectConcepts(exp *Export) []concept {
 	var out []concept
 	index := map[string]int{} // lower-cased name -> position in out
+	// seenSection guards against duplicate (concept, section) pairs that arise
+	// when a section lists the same concept twice or in two casings.
+	seenSection := map[string]bool{} // "conceptIdx:secName"
 	for _, sec := range exp.Source.Sections {
 		study := exp.Studies[sec.ID]
 		if study == nil {
@@ -99,7 +107,11 @@ func collectConcepts(exp *Export) []concept {
 				index[key] = i
 				out = append(out, concept{Name: name})
 			}
-			out[i].Sections = append(out[i].Sections, secName)
+			guard := fmt.Sprintf("%d:%s", i, secName)
+			if !seenSection[guard] {
+				seenSection[guard] = true
+				out[i].Sections = append(out[i].Sections, secName)
+			}
 		}
 	}
 	return out
@@ -116,17 +128,26 @@ func renderHub(exp *Export) string {
 	return b.String()
 }
 
-func renderSection(hub string, sec model.Section, study *model.SectionStudy) string {
+func renderSection(hub string, sec model.Section, study *model.SectionStudy, canon map[string]string) string {
 	var b strings.Builder
+	t := Sanitize(sec.Title)
+	if t == "" {
+		t = "Untitled"
+	}
 	fmt.Fprintf(&b, "---\nsource: %q\norder: %d\n---\n\n# %s\n\n",
-		"[["+hub+"]]", sec.Idx+1, SectionName(sec.Idx, sec.Title)[3:])
+		"[["+hub+"]]", sec.Idx+1, t)
 	if study != nil {
 		fmt.Fprintf(&b, "## Summary\n\n%s\n\n", study.Summary)
 		var links []string
 		for _, c := range study.KeyConcepts {
-			if s := Sanitize(c); s != "" {
-				links = append(links, "- [["+s+"]]")
+			s := Sanitize(c)
+			if s == "" {
+				continue
 			}
+			if canonical, ok := canon[strings.ToLower(s)]; ok {
+				s = canonical
+			}
+			links = append(links, "- [["+s+"]]")
 		}
 		if len(links) > 0 {
 			fmt.Fprintf(&b, "## Key concepts\n\n%s\n\n", strings.Join(links, "\n"))
@@ -145,7 +166,7 @@ func renderSection(hub string, sec model.Section, study *model.SectionStudy) str
 // calloutLines prefixes every line of s with "> " so multi-line text stays
 // inside the callout block.
 func calloutLines(b *strings.Builder, s string) {
-	for _, line := range strings.Split(s, "\n") {
+	for _, line := range strings.Split(strings.TrimRight(s, "\n"), "\n") {
 		fmt.Fprintf(b, "> %s\n", line)
 	}
 }
