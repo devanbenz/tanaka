@@ -99,6 +99,18 @@ func TestDecodeRejectsUnsupportedVersion(t *testing.T) {
 	}
 }
 
+func TestEncodeDoesNotMutateCaller(t *testing.T) {
+	s := sample()
+	s.Version = 99
+	var buf bytes.Buffer
+	if err := Encode(&buf, s); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	if s.Version != 99 {
+		t.Fatalf("Encode mutated caller: Version = %d, want 99", s.Version)
+	}
+}
+
 func TestFilename(t *testing.T) {
 	cases := map[string]string{
 		"My Paper":                 "my-paper.tanaka",

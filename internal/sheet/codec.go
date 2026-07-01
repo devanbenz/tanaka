@@ -14,14 +14,15 @@ import (
 )
 
 // Encode writes s as gzipped JSON. Format and Version are set to the current
-// envelope values, overriding whatever the caller left in place.
+// envelope values in a local copy; the caller's struct is not modified.
 func Encode(w io.Writer, s *model.Sheet) error {
-	s.Format = model.SheetFormat
-	s.Version = model.SheetVersion
+	out := *s
+	out.Format = model.SheetFormat
+	out.Version = model.SheetVersion
 	zw := gzip.NewWriter(w)
 	enc := json.NewEncoder(zw)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(s); err != nil {
+	if err := enc.Encode(&out); err != nil {
 		zw.Close()
 		return fmt.Errorf("encode sheet: %w", err)
 	}
