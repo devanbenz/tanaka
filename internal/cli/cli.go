@@ -19,6 +19,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/ingest"
 	"github.com/devandbenz/tanaka/internal/model"
+	"github.com/devandbenz/tanaka/internal/obsidian"
 	"github.com/devandbenz/tanaka/internal/sheet"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
@@ -38,7 +39,7 @@ Commands:
   list               List imported sources
   remove <id>        Remove an imported source (and its sections)
   prepare <id>       Generate the study package for a source (quizzes etc.)
-  export <id> [-o file]   Package a source (+quizzes) into a shareable .tanaka file
+  export <id> [--format sheet|obsidian] [-o path]   Export a source: shareable .tanaka sheet, or Obsidian notes folder
   import <file>      Import a .tanaka file as a new source
   build <id> --lang L [--difficulty D]   Scaffold a build workspace for a source
   serve [--port N]   Start the local study web UI (default 127.0.0.1:7777)
@@ -225,44 +226,71 @@ func cmdList(ctx context.Context, d deps, stdout, stderr io.Writer) int {
 func cmdExport(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("export", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	outPath := fs.String("o", "", "output file (default: <slug>.tanaka)")
+	outPath := fs.String("o", "", "output file (sheet) or directory (obsidian); default derived from title")
+	format := fs.String("format", "sheet", "export format: sheet|obsidian")
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: tanaka export <id> [-o file]")
+		fmt.Fprintln(stderr, "usage: tanaka export <id> [--format sheet|obsidian] [-o path]")
 		return 2
 	}
 	id := args[0]
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
-	sh, err := d.store.ExportSource(ctx, id)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", id)
+	switch *format {
+	case "sheet":
+		sh, err := d.store.ExportSource(ctx, id)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", id)
+				return 1
+			}
+			fmt.Fprintf(stderr, "export: %v\n", err)
 			return 1
 		}
-		fmt.Fprintf(stderr, "export: %v\n", err)
-		return 1
+		path := *outPath
+		if path == "" {
+			path = sheet.Filename(sh.Source.Title)
+		}
+		f, err := os.Create(path)
+		if err != nil {
+			fmt.Fprintf(stderr, "export: %v\n", err)
+			return 1
+		}
+		if err := sheet.Encode(f, sh); err != nil {
+			f.Close()
+			fmt.Fprintf(stderr, "export: %v\n", err)
+			return 1
+		}
+		if err := f.Close(); err != nil {
+			fmt.Fprintf(stderr, "export: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "exported %q to %s\n", sh.Source.Title, path)
+		return 0
+	case "obsidian":
+		exp, err := obsidian.Assemble(ctx, d.store, id)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				fmt.Fprintf(stderr, "no source with id %s (use 'tanaka list' to see ids)\n", id)
+				return 1
+			}
+			fmt.Fprintf(stderr, "export: %v\n", err)
+			return 1
+		}
+		dir := *outPath
+		if dir == "" {
+			dir = sheet.Slug(exp.Source.Title)
+		}
+		if err := obsidian.Write(dir, exp); err != nil {
+			fmt.Fprintf(stderr, "export: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "exported %q to %s (obsidian)\n", exp.Source.Title, dir)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "invalid --format %q (use sheet|obsidian)\n", *format)
+		return 2
 	}
-	path := *outPath
-	if path == "" {
-		path = sheet.Filename(sh.Source.Title)
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		fmt.Fprintf(stderr, "export: %v\n", err)
-		return 1
-	}
-	if err := sheet.Encode(f, sh); err != nil {
-		f.Close()
-		fmt.Fprintf(stderr, "export: %v\n", err)
-		return 1
-	}
-	if err := f.Close(); err != nil {
-		fmt.Fprintf(stderr, "export: %v\n", err)
-		return 1
-	}
-	fmt.Fprintf(stdout, "exported %q to %s\n", sh.Source.Title, path)
-	return 0
 }
 
 func cmdImport(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
