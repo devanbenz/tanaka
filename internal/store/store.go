@@ -17,6 +17,7 @@ type Store interface {
 	GetSource(ctx context.Context, id string) (*model.Source, error)
 	ListSources(ctx context.Context) ([]*model.Source, error)
 	DeleteSource(ctx context.Context, id string) error
+	ExportSource(ctx context.Context, id string) (*model.Sheet, error)
 	SaveSectionStudy(ctx context.Context, s *model.SectionStudy) error
 	GetSectionStudy(ctx context.Context, sectionID string) (*model.SectionStudy, error)
 	IsPrepared(ctx context.Context, sourceID string) (bool, error)
