@@ -7,10 +7,16 @@
     {{else}}
     <ul class="tree-view">
       {{range .Sources}}
-      <li><a href="/study/{{.ID}}">{{.Title}}</a> &mdash; {{.Done}}/{{.Total}} &middot; <a href="/build/{{.ID}}">build</a></li>
+      <li><a href="/study/{{.ID}}">{{.Title}}</a> &mdash; {{.Done}}/{{.Total}} &middot; <a href="/build/{{.ID}}">build</a> &middot; <a href="/export/{{.ID}}">export</a></li>
       {{end}}
     </ul>
     {{end}}
+    <hr>
+    <form action="/import" method="post" enctype="multipart/form-data">
+      <label for="sheet">Import a sheet:</label>
+      <input type="file" id="sheet" name="sheet" accept=".tanaka" required>
+      <button type="submit">Import</button>
+    </form>
   </div>
 </div>
 {{end}}
