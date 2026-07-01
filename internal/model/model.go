@@ -124,3 +124,53 @@ type Build struct {
 	CreatedAt  time.Time
 	Steps      []BuildStep
 }
+
+// Sheet envelope constants.
+const (
+	SheetFormat  = "tanaka.sheet"
+	SheetVersion = 1
+)
+
+// Sheet is the exportable/importable package for one source. It intentionally
+// carries no database IDs and no learner progress — importing creates a fresh
+// source with new IDs.
+type Sheet struct {
+	Format     string      `json:"format"`
+	Version    int         `json:"version"`
+	ExportedAt int64       `json:"exported_at"`
+	Source     SheetSource `json:"source"`
+}
+
+// SheetSource is the source metadata plus its ordered sections.
+type SheetSource struct {
+	Title    string         `json:"title"`
+	Origin   string         `json:"origin"`
+	Sections []SheetSection `json:"sections"`
+}
+
+// SheetSection is one section's content plus its study package (nil if the
+// section has no generated quiz).
+type SheetSection struct {
+	Idx      int         `json:"idx"`
+	Title    string      `json:"title"`
+	Markdown string      `json:"markdown"`
+	Study    *SheetStudy `json:"study"`
+}
+
+// SheetStudy is a section's generated study package, minus IDs.
+type SheetStudy struct {
+	Summary     string          `json:"summary"`
+	KeyConcepts []string        `json:"key_concepts"`
+	Questions   []SheetQuestion `json:"questions"`
+}
+
+// SheetQuestion is one quiz item, minus IDs and section linkage.
+type SheetQuestion struct {
+	Idx          int      `json:"idx"`
+	Kind         string   `json:"kind"`
+	Prompt       string   `json:"prompt"`
+	Options      []string `json:"options"`
+	CorrectIndex int      `json:"correct_index"`
+	Rubric       string   `json:"rubric"`
+	Explanation  string   `json:"explanation"`
+}
