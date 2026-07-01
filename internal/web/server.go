@@ -19,6 +19,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/build"
 	"github.com/devandbenz/tanaka/internal/model"
+	"github.com/devandbenz/tanaka/internal/sheet"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
 )
@@ -60,6 +61,8 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(sub)))
 	mux.HandleFunc("GET /{$}", s.handleHome)
+	mux.HandleFunc("GET /export/{id}", s.handleExport)
+	mux.HandleFunc("POST /import", s.handleImport)
 	mux.HandleFunc("GET /study/{id}", s.handleStudyEntry)
 	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
 	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
@@ -623,6 +626,51 @@ func readWorkspaceText(ws string) string {
 		return nil
 	})
 	return sb.String()
+}
+
+func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	sh, err := s.store.ExportSource(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+sheet.Filename(sh.Source.Title)+"\"")
+	if err := sheet.Encode(w, sh); err != nil {
+		// Headers already sent; log and stop.
+		s.log.Error("export encode failed", "id", id, "err", err)
+	}
+}
+
+func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// Cap the upload at 32 MiB.
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, "bad upload", http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("sheet")
+	if err != nil {
+		http.Error(w, "no sheet file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	sh, err := sheet.Decode(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, err := s.store.ImportSheet(ctx, sh, s.newID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
