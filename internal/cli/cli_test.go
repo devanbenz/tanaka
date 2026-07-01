@@ -128,6 +128,7 @@ func TestCmdExportObsidian(t *testing.T) {
 
 func TestCmdExportInvalidFormat(t *testing.T) {
 	d := testDeps(t)
+	seedSource(t, d)
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{"export", "src1", "--format", "yaml"}, d, &stdout, &stderr)
 	if code != 2 {
