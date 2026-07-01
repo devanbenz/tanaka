@@ -235,7 +235,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.store.SetQuestionVerdict(ctx, q.ID, v.Verdict); err != nil {
+	if err := s.store.SaveQuestionProgress(ctx, q.ID, v.Verdict, req.Answer, req.Choice, v.Feedback); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -452,6 +452,38 @@ type navItem struct {
 	Unlocked bool
 }
 
+// sectionQuestion pairs a quiz question with the learner's latest saved attempt
+// so the section template can restore the answer, selected choice, and verdict.
+type sectionQuestion struct {
+	model.Question
+	Answered    bool
+	Verdict     string
+	VerdictText string // "verdict - feedback" (matches app.js), feedback optional
+	Answer      string
+	Choice      int
+}
+
+// buildSectionQuestions attaches saved progress to each question. Unanswered
+// questions carry Answered=false, Choice=-1, and no verdict.
+func buildSectionQuestions(questions []model.Question, progress map[string]model.QuestionProgress) []sectionQuestion {
+	out := make([]sectionQuestion, 0, len(questions))
+	for _, q := range questions {
+		sq := sectionQuestion{Question: q, Choice: -1}
+		if p, ok := progress[q.ID]; ok {
+			sq.Answered = true
+			sq.Verdict = p.Verdict
+			sq.Answer = p.Answer
+			sq.Choice = p.Choice
+			sq.VerdictText = p.Verdict
+			if p.Feedback != "" {
+				sq.VerdictText += " - " + p.Feedback
+			}
+		}
+		out = append(out, sq)
+	}
+	return out
+}
+
 func mark(status string) string {
 	switch status {
 	case model.StatusPassed:
@@ -636,6 +668,12 @@ func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	progress, err := s.store.GetSectionProgress(ctx, sec.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	questions := buildSectionQuestions(stud.Questions, progress)
 	var nav []navItem
 	done := 0
 	for i, seci := range src.Sections {
@@ -647,7 +685,7 @@ func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
 	hasNext := idx+1 < len(src.Sections)
 	data := map[string]any{
 		"Title": src.Title, "Source": src, "Section": sec, "Body": body,
-		"Concepts": stud.KeyConcepts, "Questions": stud.Questions, "Nav": nav,
+		"Concepts": stud.KeyConcepts, "Questions": questions, "Nav": nav,
 		"Done": done, "Total": len(src.Sections),
 		"HasNext": hasNext, "NextIdx": idx + 1,
 		"NextUnlocked": ordered[idx] == model.StatusPassed || ordered[idx] == model.StatusSkipped,

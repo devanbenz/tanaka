@@ -30,7 +30,58 @@ func NewSQLite(path string) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	return &sqliteStore{db: db}, nil
+}
+
+// migrate applies additive schema changes to databases created before those
+// columns existed. CREATE TABLE IF NOT EXISTS never alters an existing table, so
+// pre-existing databases need ADD COLUMN. Each addition is guarded by inspecting
+// the current columns, making migrate idempotent and safe to run on every open.
+func migrate(db *sql.DB) error {
+	adds := []struct{ column, ddl string }{
+		{"answer", `ALTER TABLE question_progress ADD COLUMN answer TEXT NOT NULL DEFAULT ''`},
+		{"choice", `ALTER TABLE question_progress ADD COLUMN choice INTEGER NOT NULL DEFAULT -1`},
+		{"feedback", `ALTER TABLE question_progress ADD COLUMN feedback TEXT NOT NULL DEFAULT ''`},
+	}
+	existing, err := tableColumns(db, "question_progress")
+	if err != nil {
+		return err
+	}
+	for _, a := range adds {
+		if existing[a.column] {
+			continue
+		}
+		if _, err := db.Exec(a.ddl); err != nil {
+			return fmt.Errorf("add column %s: %w", a.column, err)
+		}
+	}
+	return nil
+}
+
+// tableColumns returns the set of column names on a table via PRAGMA table_info.
+func tableColumns(db *sql.DB, table string) (map[string]bool, error) {
+	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return nil, fmt.Errorf("table_info %s: %w", table, err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			name, ctype      string
+			dflt             sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return nil, fmt.Errorf("scan table_info: %w", err)
+		}
+		cols[name] = true
+	}
+	return cols, rows.Err()
 }
 
 func (s *sqliteStore) SaveSource(ctx context.Context, src *model.Source) error {

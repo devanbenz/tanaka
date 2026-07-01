@@ -30,14 +30,15 @@
             <p>{{.Prompt}}</p>
             {{if eq .Kind "mcq"}}
               {{$qid := .ID}}
+              {{$choice := .Choice}}
               {{range $i, $opt := .Options}}
-                <div class="field-row"><input type="radio" id="q-{{$qid}}-{{$i}}" name="q-{{$qid}}" value="{{$i}}"><label for="q-{{$qid}}-{{$i}}">{{$opt}}</label></div>
+                <div class="field-row"><input type="radio" id="q-{{$qid}}-{{$i}}" name="q-{{$qid}}" value="{{$i}}"{{if eq $choice $i}} checked{{end}}><label for="q-{{$qid}}-{{$i}}">{{$opt}}</label></div>
               {{end}}
             {{else}}
-              <textarea rows="4" cols="50"></textarea>
+              <textarea rows="4" cols="50">{{.Answer}}</textarea>
             {{end}}
             <div class="field-row"><button type="submit">Check</button></div>
-            <div class="verdict"></div>
+            <div class="verdict{{if .Answered}} verdict-{{.Verdict}}{{end}}">{{.VerdictText}}</div>
           </form>
         {{end}}
         </fieldset>

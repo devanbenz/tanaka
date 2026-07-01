@@ -177,14 +177,42 @@ func (s *sqliteStore) GetSection(ctx context.Context, sectionID string) (*model.
 	return &sec, nil
 }
 
-func (s *sqliteStore) SetQuestionVerdict(ctx context.Context, questionID, verdict string) error {
+func (s *sqliteStore) SaveQuestionProgress(ctx context.Context, questionID, verdict, answer string, choice int, feedback string) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO question_progress (question_id, verdict) VALUES (?, ?)
-		 ON CONFLICT(question_id) DO UPDATE SET verdict=excluded.verdict`, questionID, verdict)
+		`INSERT INTO question_progress (question_id, verdict, answer, choice, feedback)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(question_id) DO UPDATE SET
+		   verdict=excluded.verdict, answer=excluded.answer,
+		   choice=excluded.choice, feedback=excluded.feedback`,
+		questionID, verdict, answer, choice, feedback)
 	if err != nil {
-		return fmt.Errorf("set verdict %s: %w", questionID, err)
+		return fmt.Errorf("save progress %s: %w", questionID, err)
 	}
 	return nil
+}
+
+// GetSectionProgress returns the latest saved attempt for every answered
+// question in a section, keyed by question id. Unanswered questions are absent.
+func (s *sqliteStore) GetSectionProgress(ctx context.Context, sectionID string) (map[string]model.QuestionProgress, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT qp.question_id, qp.verdict, qp.answer, qp.choice, qp.feedback
+		 FROM question_progress qp
+		 JOIN questions q ON q.id = qp.question_id
+		 WHERE q.section_id = ?`, sectionID)
+	if err != nil {
+		return nil, fmt.Errorf("query progress: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]model.QuestionProgress{}
+	for rows.Next() {
+		var id string
+		var p model.QuestionProgress
+		if err := rows.Scan(&id, &p.Verdict, &p.Answer, &p.Choice, &p.Feedback); err != nil {
+			return nil, fmt.Errorf("scan progress: %w", err)
+		}
+		out[id] = p
+	}
+	return out, rows.Err()
 }
 
 func (s *sqliteStore) SectionSatisfied(ctx context.Context, sectionID string) (bool, error) {

@@ -46,20 +46,20 @@ func TestSectionSatisfied(t *testing.T) {
 	if ok, _ := s.SectionSatisfied(ctx, "sec1"); ok {
 		t.Fatal("unanswered questions -> not satisfied")
 	}
-	if err := s.SetQuestionVerdict(ctx, "q1", "pass"); err != nil {
+	if err := s.SaveQuestionProgress(ctx, "q1", "pass", "", -1, ""); err != nil {
 		t.Fatal(err)
 	}
 	if ok, _ := s.SectionSatisfied(ctx, "sec1"); ok {
 		t.Fatal("one of two answered -> not satisfied")
 	}
-	if err := s.SetQuestionVerdict(ctx, "q2", "partial"); err != nil {
+	if err := s.SaveQuestionProgress(ctx, "q2", "partial", "", -1, ""); err != nil {
 		t.Fatal(err)
 	}
 	if ok, _ := s.SectionSatisfied(ctx, "sec1"); !ok {
 		t.Fatal("all answered non-fail -> satisfied")
 	}
 	// A fail makes it unsatisfied.
-	if err := s.SetQuestionVerdict(ctx, "q2", "fail"); err != nil {
+	if err := s.SaveQuestionProgress(ctx, "q2", "fail", "", -1, ""); err != nil {
 		t.Fatal(err)
 	}
 	if ok, _ := s.SectionSatisfied(ctx, "sec1"); ok {

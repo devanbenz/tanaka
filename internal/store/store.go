@@ -24,7 +24,8 @@ type Store interface {
 	SetSectionStatus(ctx context.Context, sectionID, status string) error
 	GetQuestion(ctx context.Context, questionID string) (*model.Question, error)
 	GetSection(ctx context.Context, sectionID string) (*model.Section, error)
-	SetQuestionVerdict(ctx context.Context, questionID, verdict string) error
+	SaveQuestionProgress(ctx context.Context, questionID, verdict, answer string, choice int, feedback string) error
+	GetSectionProgress(ctx context.Context, sectionID string) (map[string]model.QuestionProgress, error)
 	SectionSatisfied(ctx context.Context, sectionID string) (bool, error)
 	SaveBuild(ctx context.Context, b *model.Build) error
 	GetBuild(ctx context.Context, sourceID, language string) (*model.Build, error)
@@ -71,7 +72,10 @@ CREATE TABLE IF NOT EXISTS section_progress (
 );
 CREATE TABLE IF NOT EXISTS question_progress (
 	question_id TEXT PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE,
-	verdict     TEXT NOT NULL
+	verdict     TEXT    NOT NULL,
+	answer      TEXT    NOT NULL DEFAULT '',
+	choice      INTEGER NOT NULL DEFAULT -1,
+	feedback    TEXT    NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS builds (
 	id          TEXT PRIMARY KEY,

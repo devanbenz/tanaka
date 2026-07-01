@@ -56,6 +56,14 @@ type SectionStudy struct {
 	Questions   []Question
 }
 
+// QuestionProgress is a learner's latest saved attempt at one question.
+type QuestionProgress struct {
+	Verdict  string // "pass" | "partial" | "fail"
+	Answer   string // free-response text ("" for MCQ)
+	Choice   int    // MCQ selected option index (-1 for free-response)
+	Feedback string // grader feedback / MCQ explanation
+}
+
 // Build languages (also the strings stored in builds.language).
 const (
 	LangRust   = "rust"
