@@ -32,18 +32,25 @@ func Encode(w io.Writer, s *model.Sheet) error {
 	return nil
 }
 
+const maxDecoded = 64 << 20 // 64 MiB decompressed limit
+
 // Decode reads a gzipped-JSON sheet and validates the envelope. It returns a
 // descriptive error for corrupt gzip, invalid JSON, an unknown format, or an
-// unsupported version.
+// unsupported version. Decompressed input is capped at maxDecoded bytes to
+// prevent decompression-bomb attacks.
 func Decode(r io.Reader) (*model.Sheet, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("read sheet: not a valid gzip file: %w", err)
 	}
 	defer zr.Close()
+	lr := &io.LimitedReader{R: zr, N: maxDecoded + 1}
 	var s model.Sheet
-	if err := json.NewDecoder(zr).Decode(&s); err != nil {
+	if err := json.NewDecoder(lr).Decode(&s); err != nil {
 		return nil, fmt.Errorf("read sheet: invalid contents: %w", err)
+	}
+	if lr.N <= 0 {
+		return nil, fmt.Errorf("read sheet: exceeds %d bytes decompressed", maxDecoded)
 	}
 	if s.Format != model.SheetFormat {
 		return nil, fmt.Errorf("not a Tanaka sheet (format %q)", s.Format)

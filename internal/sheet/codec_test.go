@@ -111,6 +111,27 @@ func TestEncodeDoesNotMutateCaller(t *testing.T) {
 	}
 }
 
+func TestDecodeRejectsOversized(t *testing.T) {
+	// Build a gzip stream whose decompressed content exceeds 64 MiB.
+	// We write raw bytes (not valid JSON) — we only care that the size guard
+	// fires before or during JSON decoding, returning an error.
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	chunk := bytes.Repeat([]byte("x"), 1<<20) // 1 MiB chunk
+	for i := 0; i < 65; i++ {                 // 65 MiB total > 64 MiB cap
+		zw.Write(chunk)
+	}
+	zw.Close()
+	_, err := Decode(&buf)
+	if err == nil {
+		t.Fatal("expected error for oversized decompressed input, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "64") && !strings.Contains(msg, "exceeds") && !strings.Contains(msg, "invalid") {
+		t.Fatalf("error message doesn't indicate size limit or decode failure: %q", msg)
+	}
+}
+
 func TestFilename(t *testing.T) {
 	cases := map[string]string{
 		"My Paper":                 "my-paper.tanaka",
