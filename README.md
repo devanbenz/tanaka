@@ -31,6 +31,13 @@ List or remove sources (ids come from `tanaka list`):
     tanaka list
     tanaka remove <id>
 
+Share a source and its quizzes as a single `.tanaka` file, and import one
+someone shared with you (imported files always create a fresh source):
+
+    tanaka export <id>               # writes <slug>.tanaka
+    tanaka export <id> -o sheet.tanaka
+    tanaka import sheet.tanaka
+
 Start the local web UI and open http://127.0.0.1:7777:
 
     tanaka serve
@@ -42,6 +49,7 @@ From the web UI you can:
 - build it: pick a language and difficulty, get a scaffolded workspace with
   acceptance tests, implement each step in your editor, and run the tests in
   the browser to advance
+- export a source to a `.tanaka` file, or import one from another user
 
 You can also drive those phases from the CLI:
 
