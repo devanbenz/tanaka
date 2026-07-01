@@ -145,3 +145,17 @@ func TestFilename(t *testing.T) {
 		}
 	}
 }
+
+func TestSlug(t *testing.T) {
+	cases := map[string]string{
+		"My Paper":                  "my-paper",
+		"Attention Is All You Need": "attention-is-all-you-need",
+		"  Spaces  &  Symbols!! ":   "spaces-symbols",
+		"":                          "sheet",
+	}
+	for in, want := range cases {
+		if got := Slug(in); got != want {
+			t.Errorf("Slug(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
