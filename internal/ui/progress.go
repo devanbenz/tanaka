@@ -8,6 +8,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/mattn/go-runewidth"
+	"golang.org/x/term"
 )
 
 // kaomojiSet is a curated set of animated kaomoji; each is a list of frames.
@@ -68,10 +71,37 @@ func isTTY(w io.Writer) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// frameLine renders one animation frame: a carriage return so it overwrites in
-// place, the kaomoji frame, the message, and elapsed seconds.
-func frameLine(frame, msg string, elapsed time.Duration) string {
-	return fmt.Sprintf("\r%s  %s  (%ds) ", frame, msg, int(elapsed.Seconds()))
+// frameLine renders one animation frame: a carriage return so it overwrites
+// in place, the kaomoji frame, the message, elapsed seconds, and a
+// clear-to-EOL so shorter frames leave no residue from longer ones. The
+// message is truncated so the line never exceeds width columns — a wrapped
+// line breaks \r-based overwriting and scrolls a new line per tick. Columns
+// are display width, not runes: kaomoji contain East Asian wide characters.
+// width <= 0 means the terminal width is unknown; no truncation then.
+func frameLine(frame, msg string, elapsed time.Duration, width int) string {
+	suffix := fmt.Sprintf("  (%ds)", int(elapsed.Seconds()))
+	// Keep the last column free: writing it makes some terminals wrap anyway.
+	if avail := width - 1 - runewidth.StringWidth(frame) - 2 - runewidth.StringWidth(suffix); width > 0 && runewidth.StringWidth(msg) > avail {
+		if avail < 1 {
+			msg = ""
+		} else {
+			msg = runewidth.Truncate(msg, avail, "…")
+		}
+	}
+	return fmt.Sprintf("\r%s  %s%s\x1b[K", frame, msg, suffix)
+}
+
+// termWidth reports w's terminal width in columns, or 0 if unknown.
+func termWidth(w io.Writer) int {
+	f, ok := w.(*os.File)
+	if !ok {
+		return 0
+	}
+	width, _, err := term.GetSize(int(f.Fd()))
+	if err != nil {
+		return 0
+	}
+	return width
 }
 
 // Start begins the phase. On a TTY it animates until Stop/Fail; otherwise it
@@ -103,7 +133,8 @@ func (s *Spinner) Start() {
 					lastRotate = time.Now()
 				}
 				frames := kaomojiSet[cur]
-				fmt.Fprint(s.w, frameLine(frames[frame%len(frames)], s.msg, time.Since(s.start)))
+				// Re-measure each tick so resizes are picked up.
+				fmt.Fprint(s.w, frameLine(frames[frame%len(frames)], s.msg, time.Since(s.start), termWidth(s.w)))
 				frame++
 			}
 		}
