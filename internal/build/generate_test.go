@@ -15,7 +15,11 @@ func TestSafeRelPath(t *testing.T) {
 			t.Fatalf("SafeRelPath(%q) = %v, want nil", ok, err)
 		}
 	}
-	for _, bad := range []string{"", "/etc/passwd", "../escape", "a/../../b", "/abs"} {
+	// Windows-shaped escapes must be rejected on every platform: agent
+	// paths are slash-separated and relative, so none of these are ever
+	// legitimate, and on Windows they root outside the workspace.
+	for _, bad := range []string{"", "/etc/passwd", "../escape", "a/../../b", "/abs",
+		`..\escape`, `\etc\passwd`, `C:\evil`, "C:evil", "C:/evil", `\\srv\share`} {
 		if err := SafeRelPath(bad); err == nil {
 			t.Fatalf("SafeRelPath(%q) = nil, want error", bad)
 		}
