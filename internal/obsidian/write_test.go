@@ -110,8 +110,16 @@ func TestWriteTreeAndLinks(t *testing.T) {
 	}
 
 	// Concept dedup: sec1's "self-attention" merged into first-seen casing.
-	if _, err := os.Stat(filepath.Join(dir, "concepts", "self-attention.md")); err == nil {
-		t.Error("lowercase duplicate concept file exists")
+	// Compare directory entries by exact name — os.Stat would match the
+	// canonical file case-insensitively on macOS (APFS).
+	entries, err := os.ReadDir(filepath.Join(dir, "concepts"))
+	if err != nil {
+		t.Fatalf("read concepts dir: %v", err)
+	}
+	for _, e := range entries {
+		if e.Name() == "self-attention.md" {
+			t.Error("lowercase duplicate concept file exists")
+		}
 	}
 	con := read(t, filepath.Join(dir, "concepts", "Self-Attention.md"))
 	for _, want := range []string{"Appears in:", "[[01 Intro]]", "[[02 Deep Dive]]"} {
