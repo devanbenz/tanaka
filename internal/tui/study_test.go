@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/devandbenz/tanaka/internal/agent"
 	"github.com/devandbenz/tanaka/internal/model"
 	"github.com/devandbenz/tanaka/internal/obsidian"
@@ -203,5 +204,57 @@ func TestStudyPrepareFlow(t *testing.T) {
 	s = drive(t, s, runes("p"))
 	if !strings.Contains(s.View(), "pick") {
 		t.Fatalf("after prepare the generated quiz should show:\n%s", s.View())
+	}
+}
+
+// Short content must not strand the quiz at the bottom of a tall terminal:
+// the viewport shrinks to its content instead of holding a fixed height.
+func TestStudyQuizSitsBelowShortContent(t *testing.T) {
+	d := preparedDeps(t)
+	var s screen = newStudy(d, "src1")
+	s = drive(t, s, tea.WindowSizeMsg{Width: 100, Height: 60})
+	if cmd := s.Init(); cmd != nil {
+		s = drive(t, s, cmd())
+	}
+	blanks, maxBlanks := 0, 0
+	for _, line := range strings.Split(s.View(), "\n") {
+		if strings.TrimSpace(line) == "" {
+			blanks++
+			if blanks > maxBlanks {
+				maxBlanks = blanks
+			}
+		} else {
+			blanks = 0
+		}
+	}
+	if maxBlanks > 6 {
+		t.Fatalf("quiz stranded below %d blank lines:\n%s", maxBlanks, s.View())
+	}
+}
+
+// Long prompts wrap within the pane instead of being cut off.
+func TestStudyLongPromptWraps(t *testing.T) {
+	d := preparedDeps(t)
+	ctx := context.Background()
+	long := "Compare singly linked lists and doubly linked lists, describe the structural difference, one operation that is faster on each, and the memory tradeoff involved ENDMARKER"
+	if err := d.Store.SaveSectionStudy(ctx, &model.SectionStudy{
+		SectionID: "s0", Summary: "sum", KeyConcepts: []string{"gradients"},
+		Questions: []model.Question{
+			{ID: "q0", SectionID: "s0", Idx: 0, Kind: model.KindFree, Prompt: long, Rubric: "r"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s := loadedStudy(t, d)
+	// The prompt wraps: every word stays visible and no line overflows the
+	// window width (overflowing lines are what the terminal cuts off).
+	view := s.View()
+	if !strings.Contains(view, "ENDMARKER") {
+		t.Fatalf("long prompt missing entirely:\n%s", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if w := lipgloss.Width(line); w > 100 {
+			t.Fatalf("line overflows 100-column window (%d cols): %q", w, line)
+		}
 	}
 }

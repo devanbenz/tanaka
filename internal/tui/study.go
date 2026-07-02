@@ -74,8 +74,9 @@ type studyScreen struct {
 	ta   textarea.Model
 	spin spinner.Model
 
-	qIdx   int // focused question
-	cursor int // MCQ option cursor
+	qIdx      int // focused question
+	cursor    int // MCQ option cursor
+	mainWidth int // columns available right of the sidebar
 
 	preparing bool
 	prepNote  string
@@ -384,33 +385,40 @@ func (s studyScreen) goHome() (screen, tea.Cmd) {
 	return next, h.Init()
 }
 
-// layout sizes the viewport and re-renders the section markdown.
+// layout sizes the viewport and re-renders the section markdown. The
+// viewport shrinks to its content so short sections keep the quiz directly
+// below the text instead of stranding it at the bottom of a tall terminal;
+// long content scrolls within the space left above the quiz.
 func (s *studyScreen) layout() {
 	if s.width == 0 || s.src == nil || !s.prepared {
 		return
 	}
-	mainWidth := s.width - sidebarWidth - 4
-	if mainWidth < 20 {
-		mainWidth = 20
+	s.mainWidth = s.width - sidebarWidth - 4
+	if s.mainWidth < 20 {
+		s.mainWidth = 20
 	}
-	quizHeight := 10
-	vpHeight := s.height - quizHeight - 4
-	if vpHeight < 3 {
-		vpHeight = 3
-	}
-	s.vp = viewport.New(mainWidth, vpHeight)
-	s.ta.SetWidth(mainWidth - 4)
+	s.ta.SetWidth(s.mainWidth - 4)
 	md := s.src.Sections[s.idx].Markdown
 	if s.stud != nil && s.stud.Summary != "" {
 		md = "**Summary:** " + s.stud.Summary + "\n\n---\n\n" + md
 	}
-	if r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(mainWidth-2)); err == nil {
+	content := md
+	if r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(s.mainWidth-2)); err == nil {
 		if out, err := r.Render(md); err == nil {
-			s.vp.SetContent(out)
-			return
+			content = out
 		}
 	}
-	s.vp.SetContent(md)
+	const quizHeight = 12 // quiz box + title + help + status
+	maxVP := s.height - quizHeight
+	if maxVP < 3 {
+		maxVP = 3
+	}
+	vpHeight := lipgloss.Height(strings.TrimRight(content, "\n"))
+	if vpHeight > maxVP {
+		vpHeight = maxVP
+	}
+	s.vp = viewport.New(s.mainWidth, vpHeight)
+	s.vp.SetContent(content)
 }
 
 func verdictLine(p model.QuestionProgress) string {
@@ -485,7 +493,9 @@ func (s studyScreen) quiz() string {
 	} else if p, ok := s.progress[q.ID]; ok {
 		b.WriteString(verdictLine(p) + "\n")
 	}
-	return quizStyle.Render(b.String())
+	// Width both wraps long prompts/options/feedback and stops them from
+	// overflowing the pane (the terminal cuts overflowing lines off).
+	return quizStyle.Width(s.mainWidth).Render(b.String())
 }
 
 func (s studyScreen) View() string {
@@ -502,10 +512,10 @@ func (s studyScreen) View() string {
 			faintStyle.Render("p prepare • esc home • q quit"))
 	}
 	main := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render(s.src.Sections[s.idx].Title),
+		titleStyle.Width(s.mainWidth).Render(s.src.Sections[s.idx].Title),
 		s.vp.View(),
 		s.quiz(),
-		faintStyle.Render("tab/←→ question • ↑↓ option • enter check • ctrl+s submit • [ ] section • s skip • esc home"),
+		faintStyle.Width(s.mainWidth).Render("tab/←→ question • ↑↓ option • enter check • ctrl+s submit • [ ] section • s skip • esc home"),
 	)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, s.sidebar(), main)
 	if s.status != "" {
