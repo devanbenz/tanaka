@@ -3,13 +3,25 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
+// setHome fakes the home directory for os.UserHomeDir, which reads
+// %USERPROFILE% on Windows and $HOME elsewhere.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	key := "HOME"
+	if runtime.GOOS == "windows" {
+		key = "USERPROFILE"
+	}
+	t.Setenv(key, dir)
+}
+
 func TestDataDirCreatesUnderHome(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	dir, err := DataDir()
 	if err != nil {
 		t.Fatalf("DataDir: %v", err)
@@ -40,7 +52,7 @@ func TestNewIDUniqueAndHex(t *testing.T) {
 
 func TestDBPath(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	p, err := DBPath()
 	if err != nil {
 		t.Fatal(err)
