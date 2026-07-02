@@ -254,7 +254,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if satisfied {
-			if err := s.passAndUnlockNext(ctx, q.SectionID); err != nil {
+			if err := study.PassAndUnlockNext(ctx, s.store, q.SectionID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -275,34 +275,6 @@ func (s *Server) DrainObsidian() { s.obs.Drain() }
 // via the shared obsidian.Syncer. No-op when serve was started without
 // --obsidian-dir; never blocks or fails the HTTP response.
 func (s *Server) syncObsidian(sourceID string) { s.obs.Sync(sourceID) }
-
-// passAndUnlockNext marks the section passed and unlocks the following section
-// (by source order) if it is currently locked.
-func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error {
-	sec, err := s.store.GetSection(ctx, sectionID)
-	if err != nil {
-		return err
-	}
-	if err := s.store.SetSectionStatus(ctx, sectionID, model.StatusPassed); err != nil {
-		return err
-	}
-	src, err := s.store.GetSource(ctx, sec.SourceID)
-	if err != nil {
-		return err
-	}
-	next := sec.Idx + 1
-	if next < len(src.Sections) {
-		statuses, err := s.store.GetSectionStatuses(ctx, src.ID)
-		if err != nil {
-			return err
-		}
-		nextID := src.Sections[next].ID
-		if statuses[nextID] == model.StatusLocked {
-			return s.store.SetSectionStatus(ctx, nextID, model.StatusUnlocked)
-		}
-	}
-	return nil
-}
 
 func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -325,25 +297,13 @@ func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.store.SetSectionStatus(ctx, src.Sections[idx].ID, model.StatusSkipped); err != nil {
+	// No sync on skip: any completed questions were already synced when
+	// graded, and a skip adds nothing new to the vault.
+	if err := study.SkipAndUnlockNext(ctx, s.store, src.Sections[idx].ID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// No sync on skip: any completed questions were already synced when
-	// graded, and a skip adds nothing new to the vault.
-	next := idx + 1
-	if next < len(src.Sections) {
-		statuses, err := s.store.GetSectionStatuses(ctx, id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if statuses[src.Sections[next].ID] == model.StatusLocked {
-			if err := s.store.SetSectionStatus(ctx, src.Sections[next].ID, model.StatusUnlocked); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
+	if next := idx + 1; next < len(src.Sections) {
 		http.Redirect(w, r, "/study/"+id+"/"+itoa(next), http.StatusSeeOther)
 		return
 	}
