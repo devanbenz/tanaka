@@ -38,10 +38,11 @@ var (
 
 // home lists sources: enter studies, d deletes (with confirm), q quits.
 type home struct {
-	deps    Deps
-	list    list.Model
-	confirm *sourceItem // non-nil while a delete awaits confirmation
-	status  string
+	deps          Deps
+	list          list.Model
+	confirm       *sourceItem // non-nil while a delete awaits confirmation
+	status        string
+	width, height int
 }
 
 func newHome(d Deps) home {
@@ -97,6 +98,7 @@ func deleteSource(d Deps, it sourceItem) tea.Cmd {
 func (h home) Update(msg tea.Msg) (screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		h.width, h.height = msg.Width, msg.Height
 		h.list.SetSize(msg.Width, msg.Height-2) // room for the status line
 		return h, nil
 	case sourcesMsg:
@@ -127,8 +129,10 @@ func (h home) Update(msg tea.Msg) (screen, tea.Cmd) {
 		case "q", "ctrl+c":
 			return h, tea.Quit
 		case "enter":
-			if _, ok := h.list.SelectedItem().(sourceItem); ok {
-				h.status = "the study screen lands in the next PR"
+			if it, ok := h.list.SelectedItem().(sourceItem); ok {
+				st := newStudy(h.deps, it.id)
+				next, _ := st.Update(tea.WindowSizeMsg{Width: h.width, Height: h.height})
+				return next, st.Init()
 			}
 			return h, nil
 		case "d":

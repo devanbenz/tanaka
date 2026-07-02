@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -32,14 +34,26 @@ func testDeps(t *testing.T) Deps {
 }
 
 // drive runs msg through the screen and keeps executing any returned
-// commands until none remain, feeding their messages back in.
+// commands until none remain, feeding their messages back in. Batches are
+// unpacked and executed in order.
 func drive(t *testing.T, s screen, msg tea.Msg) screen {
 	t.Helper()
 	queue := []tea.Msg{msg}
 	for len(queue) > 0 {
-		var cmd tea.Cmd
-		s, cmd = s.Update(queue[0])
+		head := queue[0]
 		queue = queue[1:]
+		if batch, ok := head.(tea.BatchMsg); ok {
+			for _, c := range batch {
+				if c != nil {
+					if m := c(); m != nil {
+						queue = append(queue, m)
+					}
+				}
+			}
+			continue
+		}
+		var cmd tea.Cmd
+		s, cmd = s.Update(head)
 		if cmd != nil {
 			if m := cmd(); m != nil {
 				queue = append(queue, m)
@@ -48,6 +62,8 @@ func drive(t *testing.T, s screen, msg tea.Msg) screen {
 	}
 	return s
 }
+
+func discardTestLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func runes(s string) tea.Msg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)} }
 
@@ -72,11 +88,15 @@ func TestHomeListsSourcesWithProgress(t *testing.T) {
 	}
 }
 
-func TestHomeEnterAnnouncesStudyComingSoon(t *testing.T) {
+func TestHomeEnterOpensStudy(t *testing.T) {
 	s := loadedHome(t, testDeps(t))
 	s = drive(t, s, tea.KeyMsg{Type: tea.KeyEnter})
-	if !strings.Contains(s.View(), "next PR") {
-		t.Fatalf("enter should set a coming-soon status:\n%s", s.View())
+	if _, ok := s.(studyScreen); !ok {
+		t.Fatalf("enter should open the study screen, got %T", s)
+	}
+	// The seeded source has no studies, so study offers prepare.
+	if !strings.Contains(s.View(), "press p") {
+		t.Fatalf("unprepared study view should offer prepare:\n%s", s.View())
 	}
 }
 
