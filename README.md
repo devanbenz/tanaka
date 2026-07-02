@@ -16,6 +16,20 @@ yourself in a language of your choice.
 
 ## Install
 
+Homebrew (macOS, Linux):
+
+    brew install devanbenz/tap/tanaka
+
+Scoop (Windows):
+
+    scoop bucket add devanbenz https://github.com/devanbenz/scoop-bucket
+    scoop install tanaka
+
+Prebuilt binaries for every platform are on the
+[releases page](https://github.com/devanbenz/tanaka/releases).
+
+Or build from source:
+
     go build -o tanaka .
 
 ## Usage

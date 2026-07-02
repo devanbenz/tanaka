@@ -1,0 +1,75 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: tanaka
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/devandbenz/tanaka/internal/cli.version={{.Version}}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+release:
+  # v0.1.0-beta.1 and friends are flagged as GitHub pre-releases.
+  prerelease: auto
+
+# skip_upload deliberately left at its default (false) on both publishers:
+# "auto" would silently skip prerelease tags, and the beta must ship.
+homebrew_casks:
+  - name: tanaka
+    repository:
+      owner: devanbenz
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/devanbenz/tanaka
+    description: Turn technical content into a study-then-build learning flow
+    license: MIT
+    # The binaries are unsigned; strip the quarantine bit so Gatekeeper
+    # doesn't report the cask as damaged.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tanaka"]
+          end
+
+scoops:
+  - name: tanaka
+    repository:
+      owner: devanbenz
+      name: scoop-bucket
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/devanbenz/tanaka
+    description: Turn technical content into a study-then-build learning flow
+    license: MIT
