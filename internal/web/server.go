@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/devandbenz/tanaka/internal/agent"
@@ -34,17 +33,15 @@ var assetsFS embed.FS
 
 // Server holds dependencies for the study UI.
 type Server struct {
-	store       store.Store
-	inv         agent.Invoker
-	newID       func() string
-	runner      build.Runner
-	buildsDir   string
-	obsidianDir string
-	obsMu       sync.Mutex
-	obsWG       sync.WaitGroup
-	log         *slog.Logger
-	jobs        *JobManager
-	tmpl        *template.Template
+	store     store.Store
+	inv       agent.Invoker
+	newID     func() string
+	runner    build.Runner
+	buildsDir string
+	obs       *obsidian.Syncer
+	log       *slog.Logger
+	jobs      *JobManager
+	tmpl      *template.Template
 }
 
 // NewServer parses the embedded templates and returns a Server. obsidianDir,
@@ -55,7 +52,7 @@ func NewServer(st store.Store, inv agent.Invoker, newID func() string, runner bu
 		return nil, err
 	}
 	return &Server{store: st, inv: inv, newID: newID, runner: runner, buildsDir: buildsDir,
-		obsidianDir: obsidianDir, log: log, jobs: NewJobManager(log), tmpl: tmpl}, nil
+		obs: obsidian.NewSyncer(st, obsidianDir, log), log: log, jobs: NewJobManager(log), tmpl: tmpl}, nil
 }
 
 // Handler returns the HTTP router.
@@ -130,12 +127,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		done := 0
-		for _, st := range study.OrderedStatuses(full, statuses) {
-			if st == model.StatusPassed || st == model.StatusSkipped {
-				done++
-			}
-		}
+		done := study.DoneCount(study.OrderedStatuses(full, statuses))
 		rows = append(rows, sourceRow{ID: src.ID, Title: src.Title, Done: done, Total: len(full.Sections)})
 	}
 	s.render(w, "home.html", map[string]any{"Title": "", "Sources": rows})
@@ -277,34 +269,12 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 
 // DrainObsidian blocks until all in-flight background Obsidian syncs finish.
 // Called during shutdown so a sync isn't killed mid-write.
-func (s *Server) DrainObsidian() { s.obsWG.Wait() }
+func (s *Server) DrainObsidian() { s.obs.Drain() }
 
-// syncObsidian regenerates the source's Obsidian folder in the background.
-// No-op when serve was started without --obsidian-dir. Fire-and-forget: it
-// never blocks or fails the HTTP response; errors are logged. obsMu
-// serializes writes; obsWG lets tests wait for completion.
-// Last-writer-wins: each goroutine re-reads fresh store state under obsMu, so
-// the last write always reflects the most complete snapshot.
-func (s *Server) syncObsidian(sourceID string) {
-	if s.obsidianDir == "" {
-		return
-	}
-	s.obsWG.Add(1)
-	go func() {
-		defer s.obsWG.Done()
-		s.obsMu.Lock()
-		defer s.obsMu.Unlock()
-		exp, err := obsidian.Assemble(context.Background(), s.store, sourceID)
-		if err != nil {
-			s.log.Error("obsidian sync: assemble", "source", sourceID, "err", err)
-			return
-		}
-		dir := filepath.Join(s.obsidianDir, sheet.Slug(exp.Source.Title))
-		if err := obsidian.Write(dir, exp); err != nil {
-			s.log.Error("obsidian sync: write", "source", sourceID, "err", err)
-		}
-	}()
-}
+// syncObsidian regenerates the source's Obsidian folder in the background
+// via the shared obsidian.Syncer. No-op when serve was started without
+// --obsidian-dir; never blocks or fails the HTTP response.
+func (s *Server) syncObsidian(sourceID string) { s.obs.Sync(sourceID) }
 
 // passAndUnlockNext marks the section passed and unlocks the following section
 // (by source order) if it is currently locked.

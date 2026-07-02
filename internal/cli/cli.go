@@ -23,6 +23,7 @@ import (
 	"github.com/devandbenz/tanaka/internal/sheet"
 	"github.com/devandbenz/tanaka/internal/store"
 	"github.com/devandbenz/tanaka/internal/study"
+	"github.com/devandbenz/tanaka/internal/tui"
 	"github.com/devandbenz/tanaka/internal/ui"
 	"github.com/devandbenz/tanaka/internal/web"
 )
@@ -45,6 +46,7 @@ Commands:
   import <file>      Import a .tanaka file as a new source
   build <id> --lang L [--difficulty D]   Scaffold a build workspace for a source
   serve [--port N] [--obsidian-dir D]   Start the local study web UI (default 127.0.0.1:7777)
+  tui [--obsidian-dir D]   Study in the terminal instead of the browser
   version            Print the version
   help               Show this help
 
@@ -127,6 +129,8 @@ func run(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) i
 		return cmdBuild(ctx, args[1:], d, stdout, stderr)
 	case "serve":
 		return cmdServe(ctx, args[1:], d, stdout, stderr)
+	case "tui":
+		return cmdTUI(ctx, args[1:], d, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\nrun 'tanaka help' for usage\n", args[0])
 		return 2
@@ -383,6 +387,30 @@ func cmdBuild(ctx context.Context, args []string, d deps, stdout, stderr io.Writ
 	fmt.Fprintf(stdout, "open it in your editor. steps:\n")
 	for _, st := range b.Steps {
 		fmt.Fprintf(stdout, "  %d. %s\n", st.Idx+1, st.Goal)
+	}
+	return 0
+}
+
+func cmdTUI(ctx context.Context, args []string, d deps, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	obsDir := fs.String("obsidian-dir", "", "live-export Obsidian notes to this directory as you answer")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *obsDir != "" {
+		if err := os.MkdirAll(*obsDir, 0o755); err != nil {
+			fmt.Fprintf(stderr, "tui: cannot use --obsidian-dir: %v\n", err)
+			return 1
+		}
+	}
+	// Logging to stderr would corrupt the alt-screen display; sync errors
+	// are dropped for now.
+	syncer := obsidian.NewSyncer(d.store, *obsDir, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	defer syncer.Drain()
+	if err := tui.Run(ctx, tui.Deps{Store: d.store, Inv: d.invoker, NewID: d.newID, Syncer: syncer}); err != nil {
+		fmt.Fprintf(stderr, "tui: %v\n", err)
+		return 1
 	}
 	return 0
 }
