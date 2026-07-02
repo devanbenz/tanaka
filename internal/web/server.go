@@ -69,6 +69,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleHome)
 	mux.HandleFunc("GET /export/{id}", s.handleExport)
 	mux.HandleFunc("POST /import", s.handleImport)
+	mux.HandleFunc("POST /sources/{id}/delete", s.handleDeleteSource)
 	mux.HandleFunc("GET /study/{id}", s.handleStudyEntry)
 	mux.HandleFunc("POST /study/{id}/prepare", s.handlePrepare)
 	mux.HandleFunc("GET /study/{id}/{idx}", s.handleSection)
@@ -692,6 +693,19 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		// Headers already sent; log and stop.
 		s.log.Error("export encode failed", "id", id, "err", err)
 	}
+}
+
+func (s *Server) handleDeleteSource(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := s.store.DeleteSource(r.Context(), id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
