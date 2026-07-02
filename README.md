@@ -38,15 +38,18 @@ someone shared with you (imported files always create a fresh source):
     tanaka export <id> -o sheet.tanaka
     tanaka import sheet.tanaka
 
-Export a source as an Obsidian mind map — a folder of wikilinked notes
+Export your progress as an Obsidian mind map — a folder of wikilinked notes
 (sections, questions with hidden answers, key concepts) that Obsidian's
-graph view renders as a connected web:
+graph view renders as a connected web. Only questions you've answered with a
+passing (or partial) verdict are included, so the map reflects what you've
+actually learned; with no completed questions there is nothing to export:
 
     tanaka export <id> --format obsidian            # writes ./<slug>/
     tanaka export <id> --format obsidian -o ~/vault/tanaka
 
-Or sync live while you study: with --obsidian-dir set, every section you
-pass or skip regenerates that source's notes (including your answers):
+Or sync live while you study: with --obsidian-dir set, every question you
+answer correctly adds its note (and its section's note) to the vault, so the
+map builds itself as you go. Notes are never deleted, only added or updated:
 
     tanaka serve --obsidian-dir ~/vault/tanaka
 

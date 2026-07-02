@@ -250,6 +250,11 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := gradeResponse{Verdict: v.Verdict, Feedback: v.Feedback}
 	if v.Verdict != "fail" {
+		sec, err := s.store.GetSection(ctx, q.SectionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		satisfied, err := s.store.SectionSatisfied(ctx, q.SectionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -262,6 +267,8 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 			}
 			resp.SectionPassed = true
 		}
+		// Every non-failing answer grows the vault, not just section passes.
+		s.syncObsidian(sec.SourceID)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
@@ -308,7 +315,6 @@ func (s *Server) passAndUnlockNext(ctx context.Context, sectionID string) error 
 	if err := s.store.SetSectionStatus(ctx, sectionID, model.StatusPassed); err != nil {
 		return err
 	}
-	s.syncObsidian(sec.SourceID)
 	src, err := s.store.GetSource(ctx, sec.SourceID)
 	if err != nil {
 		return err
@@ -352,7 +358,8 @@ func (s *Server) handleSkip(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.syncObsidian(id)
+	// No sync on skip: any completed questions were already synced when
+	// graded, and a skip adds nothing new to the vault.
 	next := idx + 1
 	if next < len(src.Sections) {
 		statuses, err := s.store.GetSectionStatuses(ctx, id)
