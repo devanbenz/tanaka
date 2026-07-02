@@ -27,8 +27,13 @@ type concept struct {
 }
 
 // Write renders exp into dir, creating it if needed and overwriting
-// previously generated files. Idempotent for a fixed Export.
+// previously generated files. Idempotent for a fixed Export. An export with
+// no sections (nothing completed yet) writes nothing; existing files are
+// never deleted, so the vault only grows as the learner progresses.
 func Write(dir string, exp *Export) error {
+	if len(exp.Source.Sections) == 0 {
+		return nil
+	}
 	for _, sub := range []string{"", "sections", "questions", "concepts"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
 			return fmt.Errorf("create %s: %w", filepath.Join(dir, sub), err)
@@ -153,9 +158,8 @@ func renderSection(hub string, sec model.Section, study *model.SectionStudy, can
 			fmt.Fprintf(&b, "## Key concepts\n\n%s\n\n", strings.Join(links, "\n"))
 		}
 	}
-	fmt.Fprintf(&b, "## Content\n\n%s\n", sec.Markdown)
 	if study != nil && len(study.Questions) > 0 {
-		b.WriteString("\n## Questions\n\n")
+		b.WriteString("## Questions\n\n")
 		for _, q := range study.Questions {
 			fmt.Fprintf(&b, "- [[%s]]\n", QuestionName(sec.Idx, sec.Title, q.Idx))
 		}

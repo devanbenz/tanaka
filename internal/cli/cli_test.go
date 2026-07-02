@@ -108,6 +108,9 @@ func TestCmdExportObsidian(t *testing.T) {
 	ctx := context.Background()
 	d := testDeps(t)
 	seedSource(t, d)
+	if err := d.store.SaveQuestionProgress(ctx, "q0", "pass", "because", -1, "nice"); err != nil {
+		t.Fatal(err)
+	}
 
 	out := filepath.Join(t.TempDir(), "vault")
 	var stdout, stderr bytes.Buffer
@@ -123,6 +126,25 @@ func TestCmdExportObsidian(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "[[My Paper]]") {
 		t.Fatalf("section note missing hub link:\n%s", b)
+	}
+}
+
+// Without any completed questions the obsidian export writes nothing and
+// says so, exiting 0.
+func TestCmdExportObsidianNoProgress(t *testing.T) {
+	d := testDeps(t)
+	seedSource(t, d)
+
+	out := filepath.Join(t.TempDir(), "vault")
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"export", "src1", "--format", "obsidian", "-o", out}, d, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "no completed questions") {
+		t.Fatalf("stdout = %q, want 'no completed questions' notice", stdout.String())
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("no-progress export should create nothing, stat err = %v", err)
 	}
 }
 

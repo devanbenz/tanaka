@@ -277,6 +277,10 @@ func cmdExport(ctx context.Context, args []string, d deps, stdout, stderr io.Wri
 			fmt.Fprintf(stderr, "export: %v\n", err)
 			return 1
 		}
+		if len(exp.Source.Sections) == 0 {
+			fmt.Fprintf(stdout, "no completed questions yet for %q — nothing to export\n", exp.Source.Title)
+			return 0
+		}
 		dir := *outPath
 		if dir == "" {
 			dir = sheet.Slug(exp.Source.Title)

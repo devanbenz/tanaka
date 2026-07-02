@@ -10,6 +10,8 @@ import (
 	"github.com/devandbenz/tanaka/internal/model"
 )
 
+// fixture mirrors Assemble's output shape: every question present has a
+// pass/partial verdict and every section has at least one such question.
 func fixture() *Export {
 	return &Export{
 		ExportedAt: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
@@ -18,7 +20,6 @@ func fixture() *Export {
 			Sections: []model.Section{
 				{ID: "sec0", Idx: 0, Title: "Intro", Markdown: "# hello"},
 				{ID: "sec1", Idx: 1, Title: "Deep Dive", Markdown: "body"},
-				{ID: "sec2", Idx: 2, Title: "No Study", Markdown: "raw"},
 			},
 		},
 		Studies: map[string]*model.SectionStudy{
@@ -26,16 +27,16 @@ func fixture() *Export {
 				Questions: []model.Question{
 					{ID: "q0", Idx: 0, Kind: model.KindMCQ, Prompt: "What uses self-attention?",
 						Options: []string{"CNN", "Transformer"}, CorrectIndex: 1, Explanation: "Transformers do."},
-					{ID: "q1", Idx: 1, Kind: model.KindFree, Prompt: "Explain gradients.",
-						Rubric: "mentions slope", Explanation: "The slope."},
 				}},
 			"sec1": {SectionID: "sec1", Summary: "s1", KeyConcepts: []string{"self-attention"},
 				Questions: []model.Question{
-					{ID: "q2", Idx: 0, Kind: model.KindFree, Prompt: "Why?", Rubric: "r"},
+					{ID: "q2", Idx: 0, Kind: model.KindFree, Prompt: "Explain gradients.",
+						Rubric: "mentions slope", Explanation: "The slope."},
 				}},
 		},
 		Progress: map[string]map[string]model.QuestionProgress{
 			"sec0": {"q0": {Verdict: "pass", Choice: 1, Feedback: "correct"}},
+			"sec1": {"q2": {Verdict: "partial", Answer: "slopes", Choice: -1, Feedback: "close"}},
 		},
 	}
 }
@@ -56,7 +57,7 @@ func TestWriteTreeAndLinks(t *testing.T) {
 	}
 
 	hub := read(t, filepath.Join(dir, "My Paper.md"))
-	for _, want := range []string{"origin:", "exported: 2026-07-01", "[[01 Intro]]", "[[02 Deep Dive]]", "[[03 No Study]]"} {
+	for _, want := range []string{"origin:", "exported: 2026-07-01", "[[01 Intro]]", "[[02 Deep Dive]]"} {
 		if !strings.Contains(hub, want) {
 			t.Errorf("hub missing %q:\n%s", want, hub)
 		}
@@ -64,20 +65,14 @@ func TestWriteTreeAndLinks(t *testing.T) {
 
 	sec0 := read(t, filepath.Join(dir, "sections", "01 Intro.md"))
 	for _, want := range []string{`source: "[[My Paper]]"`, "## Summary", "s0",
-		"[[Self-Attention]]", "[[gradients]]", "## Content", "# hello",
-		"[[01 Intro Q1]]", "[[01 Intro Q2]]"} {
+		"[[Self-Attention]]", "[[gradients]]", "[[01 Intro Q1]]"} {
 		if !strings.Contains(sec0, want) {
 			t.Errorf("section 01 missing %q:\n%s", want, sec0)
 		}
 	}
-
-	// Section without a study package: content only.
-	sec2 := read(t, filepath.Join(dir, "sections", "03 No Study.md"))
-	if strings.Contains(sec2, "## Summary") || strings.Contains(sec2, "## Questions") {
-		t.Errorf("no-study section has study headings:\n%s", sec2)
-	}
-	if !strings.Contains(sec2, "raw") {
-		t.Errorf("no-study section missing content:\n%s", sec2)
+	// Section notes must not embed the original source markdown.
+	if strings.Contains(sec0, "## Content") || strings.Contains(sec0, "# hello") {
+		t.Errorf("section 01 embeds source content:\n%s", sec0)
 	}
 
 	// MCQ question: options unmarked, answer in collapsed callout, attempt present.
@@ -96,14 +91,12 @@ func TestWriteTreeAndLinks(t *testing.T) {
 		t.Errorf("answer leaked outside callout:\n%s", q0)
 	}
 
-	// Free question, unanswered: no verdict, no attempt, rubric in callout.
-	q1 := read(t, filepath.Join(dir, "questions", "01 Intro Q2.md"))
-	if strings.Contains(q1, "verdict:") || strings.Contains(q1, "## My attempt") {
-		t.Errorf("unanswered question has progress artifacts:\n%s", q1)
-	}
-	for _, want := range []string{"kind: free", "> **Rubric:** mentions slope", "[[gradients]]"} {
-		if !strings.Contains(q1, want) {
-			t.Errorf("q1 missing %q:\n%s", want, q1)
+	// Free question with a partial verdict: rubric in callout, attempt present.
+	q2 := read(t, filepath.Join(dir, "questions", "02 Deep Dive Q1.md"))
+	for _, want := range []string{"kind: free", "verdict: partial",
+		"> **Rubric:** mentions slope", "**Answer:** slopes", "**Verdict:** partial"} {
+		if !strings.Contains(q2, want) {
+			t.Errorf("q2 missing %q:\n%s", want, q2)
 		}
 	}
 
@@ -125,6 +118,23 @@ func TestWriteTreeAndLinks(t *testing.T) {
 		if !strings.Contains(con, want) {
 			t.Errorf("concept missing %q:\n%s", want, con)
 		}
+	}
+}
+
+// An export with no sections (nothing completed yet) writes nothing at all.
+func TestWriteEmptyExport(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "vault")
+	exp := &Export{
+		ExportedAt: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+		Source:     &model.Source{ID: "src1", Title: "My Paper", Origin: "http://x"},
+		Studies:    map[string]*model.SectionStudy{},
+		Progress:   map[string]map[string]model.QuestionProgress{},
+	}
+	if err := Write(dir, exp); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("empty export should create nothing, stat err = %v", err)
 	}
 }
 
