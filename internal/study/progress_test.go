@@ -18,6 +18,16 @@ func TestOrderedStatuses(t *testing.T) {
 	}
 }
 
+func TestDoneCount(t *testing.T) {
+	in := []string{model.StatusPassed, model.StatusSkipped, model.StatusUnlocked, model.StatusLocked}
+	if got := DoneCount(in); got != 2 {
+		t.Fatalf("DoneCount = %d, want 2 (passed+skipped)", got)
+	}
+	if got := DoneCount(nil); got != 0 {
+		t.Fatalf("DoneCount(nil) = %d, want 0", got)
+	}
+}
+
 func TestCurrentSectionIdx(t *testing.T) {
 	cases := []struct {
 		in   []string

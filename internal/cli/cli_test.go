@@ -173,3 +173,29 @@ func TestCmdExportDefaultFormatIsSheet(t *testing.T) {
 		t.Fatalf("sheet file missing: %v", err)
 	}
 }
+
+func TestCmdTUIInvalidObsidianDir(t *testing.T) {
+	d := testDeps(t)
+	blocker := filepath.Join(t.TempDir(), "occupied")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"tui", "--obsidian-dir", filepath.Join(blocker, "sub")}, d, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "obsidian-dir") {
+		t.Fatalf("stderr = %q, want an --obsidian-dir error", stderr.String())
+	}
+}
+
+func TestHelpMentionsTUI(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"help"}, testDeps(t), &stdout, &stderr); code != 0 {
+		t.Fatalf("exit = %d", code)
+	}
+	if !strings.Contains(stdout.String(), "tui") {
+		t.Fatalf("help does not mention tui:\n%s", stdout.String())
+	}
+}

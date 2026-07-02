@@ -75,7 +75,7 @@ func TestObsidianSyncOnEachAnswer(t *testing.T) {
 	srv, st := testServerWithObsidian(t, vault)
 	seedMCQ(t, st, 2)
 	grade(t, srv, `{"questionId":"q0","choice":1}`)
-	srv.obsWG.Wait()
+	srv.DrainObsidian()
 	b, err := os.ReadFile(filepath.Join(vault, "my-paper", "questions", "01 Intro Q1.md"))
 	if err != nil {
 		t.Fatalf("answered question not synced before section pass: %v", err)
@@ -100,7 +100,7 @@ func TestObsidianNoSyncOnFail(t *testing.T) {
 	srv, st := testServerWithObsidian(t, vault)
 	seedMCQ(t, st, 1)
 	grade(t, srv, `{"questionId":"q0","choice":0}`)
-	srv.obsWG.Wait()
+	srv.DrainObsidian()
 	if _, err := os.Stat(filepath.Join(vault, "my-paper")); !os.IsNotExist(err) {
 		t.Fatalf("failed answer should not create vault files, stat err = %v", err)
 	}
@@ -117,7 +117,7 @@ func TestObsidianNoSyncOnSkipWithoutProgress(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	srv.obsWG.Wait()
+	srv.DrainObsidian()
 	if _, err := os.Stat(filepath.Join(vault, "my-paper")); !os.IsNotExist(err) {
 		t.Fatalf("skip without progress should not create vault files, stat err = %v", err)
 	}
@@ -128,7 +128,7 @@ func TestObsidianSyncOnSectionPass(t *testing.T) {
 	srv, st := testServerWithObsidian(t, vault)
 	seedMCQ(t, st, 1)
 	grade(t, srv, `{"questionId":"q0","choice":1}`)
-	srv.obsWG.Wait()
+	srv.DrainObsidian()
 	b, err := os.ReadFile(filepath.Join(vault, "my-paper", "questions", "01 Intro Q1.md"))
 	if err != nil {
 		t.Fatalf("question note not synced: %v", err)
@@ -147,5 +147,5 @@ func TestObsidianSyncDisabled(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	srv.obsWG.Wait() // returns immediately; no goroutine was spawned
+	srv.DrainObsidian() // returns immediately; no goroutine was spawned
 }

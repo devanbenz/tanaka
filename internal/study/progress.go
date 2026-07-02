@@ -16,6 +16,17 @@ func OrderedStatuses(src *model.Source, statuses map[string]string) []string {
 	return out
 }
 
+// DoneCount reports how many statuses count as completed: passed or skipped.
+func DoneCount(statuses []string) int {
+	n := 0
+	for _, st := range statuses {
+		if st == model.StatusPassed || st == model.StatusSkipped {
+			n++
+		}
+	}
+	return n
+}
+
 // CurrentSectionIdx returns the index of the first section that is not passed or
 // skipped. If all are done, it returns the last index. Empty input returns 0.
 func CurrentSectionIdx(statuses []string) int {
