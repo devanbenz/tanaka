@@ -13,6 +13,39 @@ body { background: #008080; padding: 16px; font-family: Arial, sans-serif; }
 .markdown h4, .markdown h5, .markdown h6 { font-size: 1em; margin: 0.4em 0; }
 .home-nav { margin-bottom: 8px; }
 .home-nav a { color: #fff; font-weight: bold; }
+/* 98.css's tree-view strips link styling; restore it for action links so
+   build/export/delete read as clickable. Delete is red (destructive, same
+   as .verdict-fail) and rendered as a button inside an inline form because
+   it must POST — all:unset strips 98.css's beveled button chrome. */
+ul.tree-view a.action { color: #00f; text-decoration: underline; }
+form.inline { display: inline; }
+button.link-action { all: unset; color: #00f; text-decoration: underline; cursor: pointer; }
+button.link-action.delete { color: #b00000; }
+button.link-action:focus { outline: 1px dotted currentColor; }
+
+/* 98.css has no rule for file inputs, so the browser draws a native browse
+   button. Replicate 98.css's button recipe on the file-selector pseudo-element
+   (same bevels, pressed state, and pixel font as its button/submit rules). */
+input[type="file"]::file-selector-button {
+  -webkit-font-smoothing: none;
+  font-family: "Pixelated MS Sans Serif", Arial;
+  font-size: 11px;
+  background: silver;
+  border: none;
+  border-radius: 0;
+  box-sizing: border-box;
+  color: transparent;
+  text-shadow: 0 0 #222;
+  min-height: 23px;
+  min-width: 75px;
+  padding: 0 12px;
+  margin-right: 6px;
+  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #fff, inset -2px -2px grey, inset 2px 2px #dfdfdf;
+}
+input[type="file"]::file-selector-button:active {
+  box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px grey;
+  text-shadow: 1px 1px #222;
+}
 .quiz { margin-top: 12px; }
 .verdict { margin-top: 6px; }
 .verdict-pass { color: #008000; font-weight: bold; }
