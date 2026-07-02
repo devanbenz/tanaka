@@ -18,8 +18,10 @@ func TestRunVersion(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr=%q", code, errOut.String())
 	}
-	if !strings.Contains(out.String(), "tanaka") {
-		t.Fatalf("stdout = %q, want it to contain %q", out.String(), "tanaka")
+	// version is a var injected via ldflags at release time; an unflagged
+	// build identifies itself as "dev".
+	if got, want := out.String(), "tanaka dev\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
 	}
 }
 

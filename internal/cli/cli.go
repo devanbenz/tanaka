@@ -27,7 +27,9 @@ import (
 	"github.com/devandbenz/tanaka/internal/web"
 )
 
-const version = "0.0.1"
+// version is stamped by the release build via
+// -ldflags "-X github.com/devandbenz/tanaka/internal/cli.version=<tag>".
+var version = "dev"
 
 const helpText = `Tanaka turns technical content into a study-then-build learning flow.
 
